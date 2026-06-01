@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  # ── API Gateway (webhook receiver) ──────────────────────────────
+  gateway:
+    build: ./services/gateway
+    ports: ["8080:8080"]
+    environment:
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # ── Graphify MCP servers (one per repo, spawned dynamically) ────
+  # Repos are mounted at /repos/<owner>/<repo>
+  # Each has a pre-built graphify-out/graph.json
+  graphify-mcp:
+    build: ./graphify
+    volumes:
+      - ${REPOS_PATH}:/repos:ro
+    ports: ["8765:8765"]
+    environment:
+      - REPOS_BASE=/repos
+
+  # ── Agents (horizontally scalable workers) ──────────────────────
+  agent-static:
+    build: ./services/agents/static_analysis
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
+      - QUEUE_NAME=review:static
+    depends_on: [redis, graphify-mcp]
+    deploy:
+      replicas: 2
+
+  agent-llm:
+    build: ./services/agents/llm_reviewer
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QUEUE_NAME=review:llm
+    depends_on: [redis, graphify-mcp]
+    deploy:
+      replicas: 3   # most expensive, most parallelism
+
+  agent-tests:
+    build: ./services/agents/test_suggester
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QUEUE_NAME=review:tests
+    depends_on: [redis, graphify-mcp]
+
+  # ── Aggregator ──────────────────────────────────────────────────
+  aggregator:
+    build: ./services/aggregator
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_IN=review:results
+      - QUEUE_OUT=review:aggregated
+    depends_on: [redis]
+
+  # ── Critic ──────────────────────────────────────────────────────
+  critic:
+    build: ./services/agents/critic
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QUEUE_IN=review:aggregated
+      - QUEUE_OUT=review:final
+    depends_on: [redis]
+
+  # ── GitHub commenter ────────────────────────────────────────────
+  commenter:
+    build: ./services/gateway
+    command: python commenter.py
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - QUEUE_IN=review:final
+    depends_on: [redis]
+
+volumes:
+  redis_data:
