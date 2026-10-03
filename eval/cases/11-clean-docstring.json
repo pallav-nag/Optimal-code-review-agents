@@ -1,0 +1,13 @@
+{
+  "id": "11-clean-docstring",
+  "title": "Document compute_subtotal",
+  "body": "Docs only.",
+  "edits": [
+    {
+      "file": "shopapp/pricing.py",
+      "find": "def compute_subtotal(items: list[OrderItem]) -> int:\n",
+      "replace": "def compute_subtotal(items: list[OrderItem]) -> int:\n    \"\"\"Sum of unit price x quantity, in cents.\"\"\"\n"
+    }
+  ],
+  "expected": []
+}

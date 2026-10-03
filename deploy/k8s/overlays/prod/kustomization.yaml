@@ -1,0 +1,45 @@
+# Production: 3-broker Kafka (RF=3, min ISR 2), registry images, TLS ingress.
+# Secrets come from your secret manager (e.g. External Secrets) as `graphreview-secrets`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - ingress.yaml
+images:
+  - name: graphreview-core
+    newName: ghcr.io/OWNER/graphreview-core
+    newTag: "0.2.0"
+  - name: graphreview-rag
+    newName: ghcr.io/OWNER/graphreview-rag
+    newTag: "0.2.0"
+patches:
+  - target: { kind: KafkaNodePool, name: dual-role }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/storage/volumes/0/size
+        value: 100Gi
+  - target: { kind: Kafka, name: graphreview }
+    patch: |-
+      - op: replace
+        path: /spec/kafka/config
+        value:
+          offsets.topic.replication.factor: 3
+          transaction.state.log.replication.factor: 3
+          transaction.state.log.min.isr: 2
+          default.replication.factor: 3
+          min.insync.replicas: 2
+          auto.create.topics.enable: false
+          message.max.bytes: 8388608
+  - target: { kind: KafkaTopic }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target: { kind: Deployment, name: "aggregator|publisher" }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2

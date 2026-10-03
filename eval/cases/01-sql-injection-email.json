@@ -1,0 +1,19 @@
+{
+  "id": "01-sql-injection-email",
+  "title": "Normalize email before user lookup",
+  "body": "Users were failing to log in when their email had uppercase letters or stray whitespace.",
+  "edits": [
+    {
+      "file": "shopapp/repository.py",
+      "find": "        rows = db.query(\"SELECT id, email, password_hash, role FROM users WHERE email = ?\", (email,))",
+      "replace": "        rows = db.query(f\"SELECT id, email, password_hash, role FROM users WHERE email = '{email.strip().lower()}'\")"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/repository.py",
+      "anchor": "WHERE email = '{email",
+      "category": "security"
+    }
+  ]
+}

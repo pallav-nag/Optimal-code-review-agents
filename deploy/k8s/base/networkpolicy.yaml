@@ -1,0 +1,59 @@
+# Default-deny ingress; open only the paths the pipeline uses.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-from-anywhere
+spec:
+  podSelector: { matchLabels: { app: gateway } }
+  ingress:
+    - ports: [{ port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: context-from-app
+spec:
+  podSelector: { matchLabels: { app: context } }
+  ingress:
+    - from: [{ podSelector: { matchLabels: { tier: app } } }]
+      ports: [{ port: 8001 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-from-app
+spec:
+  podSelector: { matchLabels: { tier: data } }
+  ingress:
+    - from: [{ podSelector: { matchLabels: { tier: app } } }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-from-app-and-keda
+spec:
+  podSelector: { matchLabels: { strimzi.io/cluster: graphreview } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { tier: app } }
+        - podSelector: { matchLabels: { strimzi.io/cluster: graphreview } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: keda } }
+        - podSelector: {}  # Strimzi entity operator / cluster operator in this namespace
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: metrics-scrape
+spec:
+  podSelector: { matchLabels: { tier: app } }
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+      ports: [{ port: 9100 }, { port: 8080 }, { port: 8001 }]

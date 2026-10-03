@@ -1,0 +1,109 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-static
+spec:
+  scaleTargetRef: { name: agent-static }
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: { stabilizationWindowSeconds: 300 }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: graphreview-kafka-bootstrap.graphreview.svc:9092
+        consumerGroup: agent-static
+        topic: pr.review.requested
+        lagThreshold: "5"
+        offsetResetPolicy: earliest
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-reviewer
+spec:
+  scaleTargetRef: { name: agent-reviewer }
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: { stabilizationWindowSeconds: 300 }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: graphreview-kafka-bootstrap.graphreview.svc:9092
+        consumerGroup: agent-reviewer
+        topic: pr.review.requested
+        lagThreshold: "2"
+        offsetResetPolicy: earliest
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-security
+spec:
+  scaleTargetRef: { name: agent-security }
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: { stabilizationWindowSeconds: 300 }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: graphreview-kafka-bootstrap.graphreview.svc:9092
+        consumerGroup: agent-security
+        topic: pr.review.requested
+        lagThreshold: "2"
+        offsetResetPolicy: earliest
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: agent-tests
+spec:
+  scaleTargetRef: { name: agent-tests }
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: { stabilizationWindowSeconds: 300 }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: graphreview-kafka-bootstrap.graphreview.svc:9092
+        consumerGroup: agent-tests
+        topic: pr.review.requested
+        lagThreshold: "3"
+        offsetResetPolicy: earliest
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: critic
+spec:
+  scaleTargetRef: { name: critic }
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 300
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: { stabilizationWindowSeconds: 300 }
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: graphreview-kafka-bootstrap.graphreview.svc:9092
+        consumerGroup: critic
+        topic: review.aggregated
+        lagThreshold: "2"
+        offsetResetPolicy: earliest

@@ -1,0 +1,19 @@
+{
+  "id": "04-payment-timeout-removed",
+  "title": "Tidy payment request call",
+  "body": "Cleans up the charge request arguments.",
+  "edits": [
+    {
+      "file": "shopapp/payments.py",
+      "find": "                resp = requests.post(f\"{PROVIDER_URL}/charges\", json=payload, headers=self._headers(), timeout=10)",
+      "replace": "                resp = requests.post(f\"{PROVIDER_URL}/charges\", json=payload, headers=self._headers())"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/payments.py",
+      "anchor": "resp = requests.post(f\"{PROVIDER_URL}/charges\"",
+      "category": "performance"
+    }
+  ]
+}

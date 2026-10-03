@@ -1,0 +1,19 @@
+{
+  "id": "02-float-money-discount",
+  "title": "Simplify discount calculation",
+  "body": "Replaces the integer arithmetic in apply_discount with a clearer percentage formula.",
+  "edits": [
+    {
+      "file": "shopapp/pricing.py",
+      "find": "    return subtotal_cents - (subtotal_cents * percent) // 100",
+      "replace": "    return round(subtotal_cents * (1 - percent / 100.0), 2)"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/pricing.py",
+      "anchor": "    return round(subtotal_cents",
+      "category": "bug"
+    }
+  ]
+}

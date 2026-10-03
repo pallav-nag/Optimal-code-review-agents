@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indexer
+  labels: { app: indexer, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: indexer } }
+  template:
+    metadata:
+      labels: { app: indexer, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: indexer
+          image: graphreview-rag
+          args: ["indexer"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 500m, memory: 1Gi }
+            limits: { memory: 3Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # ONNX runtime / HF hub write lock files next to the baked models
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: repos, mountPath: /var/lib/graphreview/repos }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: repos, emptyDir: { sizeLimit: 20Gi } }

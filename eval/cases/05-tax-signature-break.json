@@ -1,0 +1,29 @@
+{
+  "id": "05-tax-signature-break",
+  "title": "Make tax rates injectable",
+  "body": "compute_tax now takes the rate table as a parameter so regions can be configured per tenant.",
+  "edits": [
+    {
+      "file": "shopapp/pricing.py",
+      "find": "def compute_tax(amount_cents: int, region: str) -> int:\n    rate_bps = TAX_RATES_BPS.get(region, 0)",
+      "replace": "def compute_tax(amount_cents: int, region: str, rates: dict[str, int]) -> int:\n    rate_bps = rates.get(region, 0)"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/pricing.py",
+      "anchor": "def compute_tax(",
+      "category": "bug",
+      "alternatives": [
+        {
+          "file": "shopapp/pricing.py",
+          "anchor": "    return discounted + compute_tax(discounted, region)"
+        },
+        {
+          "file": "tests/test_pricing.py",
+          "anchor": "    assert compute_tax(1000, \"CA\") == 73"
+        }
+      ]
+    }
+  ]
+}

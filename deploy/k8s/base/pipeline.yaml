@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregator
+  labels: { app: aggregator, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: aggregator } }
+  template:
+    metadata:
+      labels: { app: aggregator, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: aggregator
+          image: graphreview-core
+          args: ["aggregator"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: critic
+  labels: { app: critic, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: critic } }
+  template:
+    metadata:
+      labels: { app: critic, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: critic
+          image: graphreview-core
+          args: ["critic"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: publisher
+  labels: { app: publisher, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: publisher } }
+  template:
+    metadata:
+      labels: { app: publisher, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: publisher
+          image: graphreview-core
+          args: ["publisher"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }

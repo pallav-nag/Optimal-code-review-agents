@@ -1,0 +1,19 @@
+{
+  "id": "10-stock-check-inverted",
+  "title": "Fix stock reservation edge case",
+  "body": "Adjusts the stock comparison in reserve_stock.",
+  "edits": [
+    {
+      "file": "shopapp/repository.py",
+      "find": "        if product is None or product.stock < quantity:",
+      "replace": "        if product is None or product.stock > quantity:"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/repository.py",
+      "anchor": "product.stock > quantity",
+      "category": "bug"
+    }
+  ]
+}

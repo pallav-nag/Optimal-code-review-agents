@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphReview</title>
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --border: #dfe3e8;
+  --ink: #1b1f24; --ink-2: #4b5563; --ink-3: #6b7280; --accent: #2f5bd3; --accent-ink: #ffffff;
+  --crit: #c62828; --warn: #b85c00; --info: #1f6feb; --nit: #6b7280; --ok: #1a7f37;
+  --crit-bg: #fde8e8; --warn-bg: #fdf0e1; --info-bg: #e5efff; --nit-bg: #eef0f3; --ok-bg: #e3f4e8;
+  --add: #e6f6ea; --del: #fcebec; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --surface: #161a20; --surface-2: #1d222a; --border: #2a313b;
+    --ink: #e6e8eb; --ink-2: #b4bac3; --ink-3: #8a929d; --accent: #6b8ff0; --accent-ink: #0f1216;
+    --crit: #ff7b72; --warn: #f0a050; --info: #6ca8ff; --nit: #9aa3ad; --ok: #56c271;
+    --crit-bg: #3a1d1d; --warn-bg: #3a2a15; --info-bg: #172a45; --nit-bg: #262b33; --ok-bg: #173322;
+    --add: #13301d; --del: #3a1a1d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+header h1 { font-size: 18px; margin: 0; }
+header .sub { color: var(--ink-3); font-size: 13px; }
+header .spacer { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); font-size: 12px; border: 1px solid var(--border); }
+button { font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: default; }
+select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); width: 100%; }
+main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px 24px; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin: 0 0 10px; }
+.stack > * + * { margin-top: 12px; }
+.jobs { list-style: none; padding: 0; margin: 0; }
+.jobs li { padding: 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.jobs li:hover { background: var(--surface-2); }
+.jobs li.sel { border-color: var(--accent); background: var(--surface-2); }
+.jobs .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jobs .m { color: var(--ink-3); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.sev { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; }
+.sev.critical { color: var(--crit); background: var(--crit-bg); } .sev.warning { color: var(--warn); background: var(--warn-bg); }
+.sev.info { color: var(--info); background: var(--info-bg); } .sev.nitpick { color: var(--nit); background: var(--nit-bg); }
+.sev.ok, .sev.approve { color: var(--ok); background: var(--ok-bg); } .sev.request_changes { color: var(--crit); background: var(--crit-bg); }
+.sev.comment { color: var(--info); background: var(--info-bg); }
+.empty { color: var(--ink-3); padding: 24px; text-align: center; }
+.pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 700px) { .pipeline { grid-template-columns: 1fr; } }
+.stage { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
+.stage .n { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; display: flex; justify-content: space-between; }
+.stage.done { border-color: var(--ok); } .stage.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.stage .v { font-weight: 600; margin-top: 4px; }
+.stage .d { color: var(--ink-3); font-size: 12px; }
+table.agents { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.agents th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 12px; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+table.agents td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.agents td.num { font-family: var(--mono); font-size: 12px; text-align: right; white-space: nowrap; }
+table.agents th.num { text-align: right; }
+table.agents .tools { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.scroll-x { overflow-x: auto; }
+pre.impact { font-family: var(--mono); font-size: 12px; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 0; white-space: pre; color: var(--ink-2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ink-3); }
+.dot.ok { background: var(--ok); } .dot.error { background: var(--crit); } .dot.wait { background: var(--accent); animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { opacity: .35; } to { opacity: 1; } }
+.finding { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.finding .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.finding .title { font-weight: 600; }
+.finding .loc { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.finding .meta { color: var(--ink-3); font-size: 12px; }
+.finding p { margin: 6px 0 0; white-space: pre-wrap; }
+.by { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-2); }
+details summary { cursor: pointer; color: var(--ink-2); font-size: 12px; margin-top: 6px; }
+details ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 12px; }
+pre.diff { font-family: var(--mono); font-size: 12px; background: var(--surface-2); border-radius: 8px; padding: 8px 0; overflow-x: auto; margin: 6px 0 0; }
+pre.diff span { display: block; padding: 0 12px; white-space: pre; }
+pre.diff .a { background: var(--add); } pre.diff .r { background: var(--del); } pre.diff .h { color: var(--ink-3); }
+.headline { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.headline h3 { margin: 0; font-size: 18px; }
+.muted { color: var(--ink-3); }
+.row { display: flex; gap: 8px; align-items: center; }
+.toast { position: fixed; bottom: 16px; right: 16px; background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>GraphReview</h1><div class="sub">Multi-agent PR review · Kafka · GraphRAG</div></div>
+  <div class="spacer"></div>
+  <span class="chip" id="index-chip">sample repo: checking…</span>
+  <button id="index-btn" hidden>Index sample repo</button>
+  <a class="chip" href="/docs">API</a>
+</header>
+
+<main>
+  <aside class="stack">
+    <section class="card" id="demo-card" hidden>
+      <h2>Open a seeded-bug PR</h2>
+      <div class="stack">
+        <select id="case-select" aria-label="Seeded case"></select>
+        <div class="muted" id="case-body" style="font-size:12px"></div>
+        <button class="primary" id="submit-btn">Submit PR for review</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Recent reviews</h2>
+      <ul class="jobs" id="jobs"><li class="empty">No reviews yet</li></ul>
+    </section>
+  </aside>
+
+  <section class="stack" id="detail" aria-live="polite">
+    <div class="card empty">Select a review, or submit a seeded PR to watch the pipeline run.</div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const SEV = ["critical", "warning", "info", "nitpick"];
+const STAGES = ["Gateway", "Agents", "Aggregator", "Critic", "Published"];
+const ORDER = { queued: 1, agents: 1, judging: 3, completed: 5 };
+let selected = null, cases = [], demo = false, lastCompleted = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
+function ago(ts) { const s = Math.max(0, Date.now() / 1000 - ts); return s < 60 ? `${s | 0}s ago` : s < 3600 ? `${(s / 60) | 0}m ago` : `${(s / 3600) | 0}h ago`; }
+function sevCounts(c) { return SEV.filter((k) => c && c[k]).map((k) => `<span class="sev ${k}">${c[k]} ${k}</span>`).join(" "); }
+
+async function loadIndex() {
+  try {
+    const i = await api("/api/repos/eval/shopapp");
+    $("#index-chip").innerHTML = `<span class="dot ok"></span> eval/shopapp · ${i.graph_nodes} nodes · ${i.graph_edges} edges (${esc(i.graph_source)}) · ${i.chunks} chunks · ${ago(i.indexed_at)}`;
+  } catch { $("#index-chip").innerHTML = `<span class="dot"></span> sample repo not indexed`; }
+}
+
+async function loadCases() {
+  try {
+    const d = await api("/api/demo/cases");
+    demo = true; cases = d.cases;
+    $("#demo-card").hidden = false; $("#index-btn").hidden = false;
+    $("#case-select").innerHTML = cases.map((c) => `<option value="${esc(c.id)}">${esc(c.id.slice(0, 2))} · ${esc(c.title)}</option>`).join("");
+    showCase();
+  } catch { /* demo mode off */ }
+}
+function showCase() { const c = cases.find((x) => x.id === $("#case-select").value); $("#case-body").textContent = c ? c.body : ""; }
+
+async function loadJobs() {
+  const { reviews } = await api("/api/reviews?limit=25");
+  if (!reviews.length) return;
+  $("#jobs").innerHTML = reviews.map((r) => `
+    <li data-id="${esc(r.job_id)}" class="${r.job_id === selected ? "sel" : ""}">
+      <div class="t">${esc(r.title || "(untitled)")}</div>
+      <div class="m"><span>${esc(r.repo)}${r.pr_number ? " #" + r.pr_number : ""}</span><span>${ago(r.created_at)}</span>
+        ${r.verdict ? `<span class="sev ${esc(r.verdict)}">${esc(r.verdict.replace("_", " "))}</span>` : `<span class="chip"><span class="dot wait"></span>${esc(r.status)}</span>`}
+        ${sevCounts(r.severities)}</div>
+    </li>`).join("");
+  document.querySelectorAll("#jobs li[data-id]").forEach((li) => li.onclick = () => { selected = li.dataset.id; loadJobs(); loadDetail(); });
+}
+
+function stage(i, done, active, name, value, detail) {
+  return `<div class="stage ${done ? "done" : active ? "active" : ""}"><div class="n"><span>${i + 1}. ${name}</span>${done ? '<span class="dot ok"></span>' : active ? '<span class="dot wait"></span>' : ""}</div>
+    <div class="v">${value}</div><div class="d">${detail}</div></div>`;
+}
+
+function agentStats(d) {
+  const r = d.review, prog = d.progress || {};
+  return (d.expected_agents || []).map((a) => [a, prog[a] || (r && r.agent_stats[a]) || null]);
+}
+
+function renderPipeline(d) {
+  const r = d.review, expected = d.expected_agents || [];
+  const reached = r ? 5 : ORDER[d.status] ?? 1;
+  const nDone = agentStats(d).filter(([, p]) => p).length;
+  const critic = r && r.agent_stats.critic;
+  const agentsDone = expected.length > 0 && nDone === expected.length;
+  return `<div class="pipeline">
+    ${stage(0, true, false, "Gateway", "queued on Kafka", `${d.files.length} file(s) → pr.review.requested`)}
+    ${stage(1, agentsDone, !agentsDone, "Agents", `${nDone}/${expected.length} reported`, `fan-out: ${expected.length} consumer groups`)}
+    ${stage(2, reached >= 3, false, "Aggregator", r ? `${r.raw_findings} raw → ${r.findings.length + r.dropped.length} merged` : "joining…", "consensus dedup")}
+    ${stage(3, reached >= 5, reached === 3, "Critic", r ? (critic ? `kept ${critic.kept} · rejected ${critic.dropped}` : "static only") : reached === 3 ? "judging…" : "—", "LLM-as-judge")}
+    ${stage(4, !!r, false, "Published", r ? `<span class="sev ${esc(r.verdict)}">${esc(r.verdict.replace("_", " "))}</span>` : "—", r ? `${(r.completed_at - d.created_at).toFixed(1)}s end-to-end` : "")}
+  </div>`;
+}
+
+function renderAgents(d) {
+  const rows = agentStats(d).map(([a, p]) => {
+    if (!p) return `<tr><td><span class="dot wait"></span> ${esc(a)}</td><td colspan="5" class="muted">running…</td></tr>`;
+    const tools = Object.entries(p.tool_calls || {}).map(([t, n]) => `${esc(t)}×${n}`).join(" ") || "—";
+    const tokens = p.llm_calls ? `${(p.input_tokens || 0).toLocaleString()} / ${(p.output_tokens || 0).toLocaleString()}` : "—";
+    return `<tr><td><span class="dot ${p.status === "ok" ? "ok" : "error"}"></span> ${esc(a)}${p.error ? `<div class="muted" style="font-size:12px">${esc(p.error)}</div>` : ""}</td>
+      <td class="num">${(p.duration_ms / 1000).toFixed(1)}s</td><td class="num">${p.findings}</td>
+      <td class="tools">${tools}</td><td class="num">${p.llm_calls || 0}</td><td class="num">${tokens}</td></tr>`;
+  }).join("");
+  return `<div class="scroll-x"><table class="agents"><thead><tr><th>Agent</th><th class="num">Time</th><th class="num">Findings</th>
+    <th>Tool calls</th><th class="num">LLM calls</th><th class="num">Tokens in / out</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function renderFinding(f, dropped) {
+  const by = (f.reported_by && f.reported_by.length ? f.reported_by : [f.agent]).map((a) => `<span class="by">${esc(a)}</span>`).join(" ");
+  return `<article class="finding" ${dropped ? 'style="opacity:.6"' : ""}>
+    <div class="top"><span class="sev ${esc(f.severity)}">${esc(f.severity)}</span><span class="title">${esc(f.title)}</span></div>
+    <div class="meta"><span class="loc">${esc(f.file)}${f.line ? ":" + f.line : ""}</span> · ${esc(f.category)} · confidence ${Math.round(f.confidence * 100)}% · ${by}</div>
+    <p>${esc(f.message)}</p>
+    ${f.suggestion ? `<p><strong>Suggestion:</strong> ${esc(f.suggestion)}</p>` : ""}
+    ${f.evidence && f.evidence.length ? `<details><summary>Evidence (${f.evidence.length})</summary><ul>${f.evidence.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></details>` : ""}
+  </article>`;
+}
+
+function renderDiff(patches) {
+  return patches.map((p) => `<details><summary>${esc(p.path)} (${esc(p.status)})</summary><pre class="diff">${
+    p.patch.split("\n").map((l) => `<span class="${l.startsWith("+") ? "a" : l.startsWith("-") ? "r" : l.startsWith("@@") ? "h" : ""}">${esc(l) || " "}</span>`).join("")
+  }</pre></details>`).join("");
+}
+
+async function loadDetail() {
+  if (!selected) return;
+  let d;
+  try { d = await api(`/api/reviews/${selected}`); } catch { return; }
+  const r = d.review;
+  const u = r && r.usage;
+  $("#detail").innerHTML = `
+    <div class="card stack">
+      <div class="headline"><h3>${esc(d.title || "(untitled)")}</h3><span class="muted">${esc(d.repo)} · job ${esc(d.job_id.slice(0, 8))}</span></div>
+      ${renderPipeline(d)}
+      ${r ? `<p>${esc(r.summary)}</p>
+        <div class="muted" style="font-size:12px">${u.llm_calls} LLM calls · ${(u.input_tokens + u.cache_read_tokens).toLocaleString()} input tokens (${u.cache_read_tokens.toLocaleString()} cached) · ${u.output_tokens.toLocaleString()} output</div>` : ""}
+    </div>
+    <div class="card"><h2>Agents</h2>${renderAgents(d)}</div>
+    ${r ? `<div class="card stack"><h2>Findings (${r.findings.length})</h2>${r.findings.length ? r.findings.map((f) => renderFinding(f)).join("") : '<div class="empty">No issues — approved.</div>'}</div>` : ""}
+    ${r && r.dropped.length ? `<div class="card stack"><h2>Rejected by critic (${r.dropped.length})</h2>${r.dropped.map((f) => renderFinding(f, true)).join("")}</div>` : ""}
+    <div class="card stack"><h2>What the code graph saw</h2><pre class="impact" id="impact">loading…</pre></div>
+    <div class="card"><h2>Diff</h2>${renderDiff(d.patches || [])}</div>`;
+  loadImpact(d.job_id);
+  if (!r) setTimeout(loadDetail, 800);
+  else if (lastCompleted !== d.job_id) { lastCompleted = d.job_id; loadJobs(); }
+}
+
+const impactCache = {};
+async function loadImpact(id) {
+  const el = () => document.getElementById("impact");
+  if (!impactCache[id]) {
+    try { impactCache[id] = (await api(`/api/reviews/${id}/impact`)).impact; }
+    catch (e) { impactCache[id] = "unavailable: " + e.message; }
+  }
+  if (el() && selected === id) el().textContent = impactCache[id];
+}
+
+$("#case-select").onchange = showCase;
+$("#submit-btn").onclick = async () => {
+  const btn = $("#submit-btn"); btn.disabled = true;
+  try {
+    const res = await api(`/api/demo/cases/${encodeURIComponent($("#case-select").value)}`, { method: "POST" });
+    selected = res.job_id; toast(res.status === "duplicate" ? "Already reviewed — showing it" : "PR submitted");
+    await loadJobs(); loadDetail();
+  } catch (e) { toast("Submit failed: " + e.message); }
+  btn.disabled = false;
+};
+$("#index-btn").onclick = async () => {
+  try { await api("/api/demo/index", { method: "POST" }); toast("Index requested — the indexer picks it up from Kafka"); } catch (e) { toast(e.message); }
+};
+
+loadIndex(); loadCases(); loadJobs();
+setInterval(loadJobs, 3000); setInterval(loadIndex, 5000);
+</script>
+</body>
+</html>

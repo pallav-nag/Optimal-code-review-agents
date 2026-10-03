@@ -1,0 +1,175 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-static
+  labels: { app: agent-static, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agent-static } }
+  template:
+    metadata:
+      labels: { app: agent-static, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: agent-static
+          image: graphreview-core
+          args: ["agent", "--role", "static"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-reviewer
+  labels: { app: agent-reviewer, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agent-reviewer } }
+  template:
+    metadata:
+      labels: { app: agent-reviewer, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: agent-reviewer
+          image: graphreview-core
+          args: ["agent", "--role", "reviewer"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-security
+  labels: { app: agent-security, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agent-security } }
+  template:
+    metadata:
+      labels: { app: agent-security, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: agent-security
+          image: graphreview-core
+          args: ["agent", "--role", "security"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-tests
+  labels: { app: agent-tests, tier: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agent-tests } }
+  template:
+    metadata:
+      labels: { app: agent-tests, tier: app }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: agent-tests
+          image: graphreview-core
+          args: ["agent", "--role", "tests"]
+          ports:
+            - { name: metrics, containerPort: 9100 }
+          envFrom:
+            - configMapRef: { name: graphreview-config }
+            - secretRef: { name: graphreview-secrets, optional: true }
+          livenessProbe: { tcpSocket: { port: metrics }, periodSeconds: 15, failureThreshold: 4 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }

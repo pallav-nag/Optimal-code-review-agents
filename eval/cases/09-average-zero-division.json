@@ -1,0 +1,19 @@
+{
+  "id": "09-average-zero-division",
+  "title": "Add average helper",
+  "body": "Adds a helper for product rating averages.",
+  "edits": [
+    {
+      "file": "shopapp/utils.py",
+      "find": "def safe_int(value, default: int = 0) -> int:",
+      "replace": "def average(values: list[float]) -> float:\n    return sum(values) / len(values)\n\n\ndef safe_int(value, default: int = 0) -> int:"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/utils.py",
+      "anchor": "    return sum(values) / len(values)",
+      "category": "bug"
+    }
+  ]
+}

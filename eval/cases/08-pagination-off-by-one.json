@@ -1,0 +1,19 @@
+{
+  "id": "08-pagination-off-by-one",
+  "title": "Refactor pagination offsets",
+  "body": "Simplifies the offset arithmetic in paginate.",
+  "edits": [
+    {
+      "file": "shopapp/utils.py",
+      "find": "    start = (page - 1) * size",
+      "replace": "    start = page * size"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/utils.py",
+      "anchor": "    start = page * size",
+      "category": "bug"
+    }
+  ]
+}

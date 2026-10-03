@@ -1,0 +1,19 @@
+{
+  "id": "06-refund-swallowed",
+  "title": "Make refunds best-effort",
+  "body": "A failed refund shouldn't crash the admin handler.",
+  "edits": [
+    {
+      "file": "shopapp/payments.py",
+      "find": "        except requests.RequestException as e:\n            log.error(\"refund failed for %s: %s\", charge_id, e)\n            raise PaymentError(str(e)) from e",
+      "replace": "        except Exception:\n            pass\n        return False"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/payments.py",
+      "anchor": "        except Exception:\n            pass",
+      "category": "bug"
+    }
+  ]
+}

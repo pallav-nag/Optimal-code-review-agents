@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: graphreview
+    folder: GraphReview
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

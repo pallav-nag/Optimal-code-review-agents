@@ -1,0 +1,19 @@
+{
+  "id": "03-authz-removed-get-order",
+  "title": "Streamline order lookup handler",
+  "body": "Removes a redundant branch from get_order.",
+  "edits": [
+    {
+      "file": "shopapp/api.py",
+      "find": "    if not auth.check_permission(user, \"view_order\", order):\n        return {\"status\": 403, \"error\": \"forbidden\"}\n    return {\"status\": 200, \"order\": order.__dict__}",
+      "replace": "    return {\"status\": 200, \"order\": order.__dict__}"
+    }
+  ],
+  "expected": [
+    {
+      "file": "shopapp/api.py",
+      "anchor": "    return {\"status\": 200, \"order\": order.__dict__}",
+      "category": "security"
+    }
+  ]
+}

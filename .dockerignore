@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+eval/results
+**/graphify-out
+deploy
+tests
+.env

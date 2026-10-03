@@ -1,95 +1,180 @@
-version: "3.9"
+# Full stack on one machine:  cp .env.example .env && docker compose up --build
+# Dashboard http://localhost:8080 · Grafana http://localhost:3000 · Prometheus http://localhost:9090
+name: graphreview
+
+x-env: &env
+  BUS_BACKEND: kafka
+  KAFKA_BOOTSTRAP: kafka:9092
+  STATE_BACKEND: redis
+  REDIS_URL: redis://redis:6379/0
+  QDRANT_URL: http://qdrant:6333
+  CONTEXT_SERVICE_URL: http://context:8001
+  LLM_BACKEND: ${LLM_BACKEND:-fake}   # keyless by default; set anthropic + ANTHROPIC_API_KEY in .env
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AGENT_MODEL: ${AGENT_MODEL:-claude-opus-5-5}
+  CRITIC_MODEL: ${CRITIC_MODEL:-claude-opus-5-5}
+  GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+  GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+  ALLOW_UNSIGNED_WEBHOOKS: ${ALLOW_UNSIGNED_WEBHOOKS:-false}
+  GRAPHIFY_ENABLED: ${GRAPHIFY_ENABLED:-true}
+  EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-fastembed}
+  FAKE_LLM_LATENCY_S: ${FAKE_LLM_LATENCY_S:-1.5}   # fake backend only: simulated model latency
+  DEMO_MODE: ${DEMO_MODE:-true}   # web UI: index the sample repo + submit seeded-bug PRs
+  LOG_JSON: "true"
+
+x-core: &core
+  image: graphreview-core:dev
+  build: { context: ., target: core }
+  environment: *env
+  restart: unless-stopped
+  depends_on:
+    kafka-init: { condition: service_completed_successfully }
+    redis: { condition: service_healthy }
+
+x-rag: &rag
+  image: graphreview-rag:dev
+  build: { context: ., target: rag }
+  environment: *env
+  restart: unless-stopped
+  depends_on:
+    kafka-init: { condition: service_completed_successfully }
+    redis: { condition: service_healthy }
+    qdrant: { condition: service_started }
 
 services:
-  # ── Infrastructure ──────────────────────────────────────────────
+  # ── infrastructure ──────────────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:4.3.1
+    ports: ["29092:29092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_MESSAGE_MAX_BYTES: 8388608
+    volumes: ["kafka_data:/var/lib/kafka/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on: { kafka: { condition: service_healthy } }
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        T=/opt/kafka/bin/kafka-topics.sh
+        for t in repo.index.requested repo.indexed pr.review.requested review.agent.results review.aggregated review.completed; do
+          $$T --bootstrap-server kafka:9092 --create --if-not-exists --topic $$t --partitions 6 \
+              --replication-factor 1 --config max.message.bytes=8388608 --config retention.ms=604800000
+        done
+        $$T --bootstrap-server kafka:9092 --create --if-not-exists --topic review.dlq --partitions 1 \
+            --replication-factor 1 --config retention.ms=2592000000 --config max.message.bytes=8388608
+        $$T --bootstrap-server kafka:9092 --list
+
   redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
+    image: redis:8.8.3-alpine
+    command: ["redis-server", "--appendonly", "yes"]
     volumes: ["redis_data:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
 
-  # ── API Gateway (webhook receiver) ──────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    ports: ["6333:6333"]
+    volumes: ["qdrant_data:/qdrant/storage"]
+
+  # ── retrieval ───────────────────────────────────────────────────────────
+  context:
+    <<: *rag
+    command: ["context", "--port", "8001"]
+    ports: ["8001:8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
+      interval: 10s
+
+  indexer:
+    <<: *rag
+    command: ["indexer"]
+    volumes: ["repos:/var/lib/graphreview/repos"]
+
+  # ── review pipeline ─────────────────────────────────────────────────────
   gateway:
-    build: ./services/gateway
+    <<: *core
+    command: ["gateway", "--port", "8080"]
     ports: ["8080:8080"]
-    environment:
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 10s
 
-  # ── Graphify MCP servers (one per repo, spawned dynamically) ────
-  # Repos are mounted at /repos/<owner>/<repo>
-  # Each has a pre-built graphify-out/graph.json
-  graphify-mcp:
-    build: ./graphify
-    volumes:
-      - ${REPOS_PATH}:/repos:ro
-    ports: ["8765:8765"]
-    environment:
-      - REPOS_BASE=/repos
-
-  # ── Agents (horizontally scalable workers) ──────────────────────
   agent-static:
-    build: ./services/agents/static_analysis
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
-      - QUEUE_NAME=review:static
-    depends_on: [redis, graphify-mcp]
-    deploy:
-      replicas: 2
+    <<: *core
+    command: ["agent", "--role", "static"]
 
-  agent-llm:
-    build: ./services/agents/llm_reviewer
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - QUEUE_NAME=review:llm
-    depends_on: [redis, graphify-mcp]
-    deploy:
-      replicas: 3   # most expensive, most parallelism
+  agent-reviewer:
+    <<: *core
+    command: ["agent", "--role", "reviewer"]
+    deploy: { replicas: 2 }
+
+  agent-security:
+    <<: *core
+    command: ["agent", "--role", "security"]
 
   agent-tests:
-    build: ./services/agents/test_suggester
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - GRAPHIFY_MCP_URL=http://graphify-mcp:8765
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - QUEUE_NAME=review:tests
-    depends_on: [redis, graphify-mcp]
+    <<: *core
+    command: ["agent", "--role", "tests"]
 
-  # ── Aggregator ──────────────────────────────────────────────────
   aggregator:
-    build: ./services/aggregator
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - QUEUE_IN=review:results
-      - QUEUE_OUT=review:aggregated
-    depends_on: [redis]
+    <<: *core
+    command: ["aggregator"]
 
-  # ── Critic ──────────────────────────────────────────────────────
   critic:
-    build: ./services/agents/critic
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - QUEUE_IN=review:aggregated
-      - QUEUE_OUT=review:final
-    depends_on: [redis]
+    <<: *core
+    command: ["critic"]
 
-  # ── GitHub commenter ────────────────────────────────────────────
-  commenter:
-    build: ./services/gateway
-    command: python commenter.py
+  publisher:
+    <<: *core
+    command: ["publisher"]
+
+  # ── observability ───────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    ports: ["9090:9090"]
+    volumes: ["./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+
+  grafana:
+    image: grafana/grafana:13.0.10
+    ports: ["3000:3000"]
     environment:
-      - REDIS_URL=redis://redis:6379
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - QUEUE_IN=review:final
-    depends_on: [redis]
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  kafka-ui:
+    profiles: ["tools"]
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports: ["8090:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
 
 volumes:
+  kafka_data:
   redis_data:
+  qdrant_data:
+  repos:
