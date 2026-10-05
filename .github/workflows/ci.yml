@@ -21,6 +21,8 @@ jobs:
       - run: pip install -e ".[dev,rag,static]"
       - run: ruff check src tests
       - run: pytest -q
+      - name: architecture diagrams are up to date
+        run: python docs/diagrams/build.py && git diff --exit-code -- docs/
       - name: eval harness smoke test (offline rule-based LLM)
         run: graphreview --llm fake --embeddings hash eval --modes graph_rag --out /tmp/eval
 

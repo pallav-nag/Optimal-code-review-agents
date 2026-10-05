@@ -16,37 +16,24 @@ make up && open http://localhost:8080   # full stack + live pipeline dashboard
 
 ![GraphReview dashboard](docs/img/dashboard.png)
 
-**Demo runbook:** [docs/DEMO.md](docs/DEMO.md) covers terminal, dashboard, live GitHub PRs, and Kubernetes,
-plus talking points.
+### Documentation
+
+| | |
+|---|---|
+| **[Architecture guide](docs/ARCHITECTURE.md)** | How it works, end to end. 11 diagrams: system map, review sequence, Kafka fan-out, agent tool loop, GraphRAG, merging, failure handling, autoscaling. Includes a glossary. |
+| **[Interactive guide](docs/architecture.html)** | The same guide with a clickable system map. Download and open it in a browser (`open docs/architecture.html`). |
+| **[Demo runbook](docs/DEMO.md)** | Terminal, dashboard, live GitHub PRs and Kubernetes demos, plus a 3-minute talk track. |
+| **[Command reference](commands.md)** | Start, stop, recover, free disk, Kubernetes, eval: every command in one place. |
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    GH[GitHub] -- webhook --> GW[gateway<br/>FastAPI, HMAC]
-    GW -- push to main --> T0[(repo.index.requested)]
-    GW -- PR opened/synced --> T1[(pr.review.requested)]
+![System map](docs/img/arch/01-system-map.svg)
 
-    T0 --> IDX[indexer<br/>Graphify + chunk + embed]
-    IDX -- graph.json --> R[(Redis)]
-    IDX -- vectors --> Q[(Qdrant)]
-
-    T1 -- group: agent-static --> A0[static<br/>ruff]
-    T1 -- group: agent-reviewer --> A1[reviewer<br/>Claude]
-    T1 -- group: agent-security --> A2[security<br/>Claude]
-    T1 -- group: agent-tests --> A3[tests<br/>Claude]
-    A1 & A2 & A3 <-. tool calls .-> CTX[context service<br/>GraphRAG API · MCP]
-    CTX --- R & Q
-
-    A0 & A1 & A2 & A3 --> T2[(review.agent.results)]
-    T2 --> AGG[aggregator<br/>join · dedupe · consensus]
-    AGG --> T3[(review.aggregated)]
-    T3 --> CR[critic<br/>LLM-as-judge]
-    CR --> T4[(review.completed)]
-    T4 --> PUB[publisher] -- review + inline comments --> GH
-```
+The left column is the review path; every teal arrow is a Kafka topic. The right column is retrieval: the
+indexer builds a code graph (Redis) and a vector index (Qdrant) ahead of time, and the context service answers the
+agents' tool calls from them. Amber boxes call Claude.
 
 | Kafka topic | Key | Producer → consumer group(s) |
 |---|---|---|
@@ -59,6 +46,10 @@ flowchart LR
 
 ### Review lifecycle
 
+![Sequence of one review](docs/img/arch/02-review-sequence.svg)
+
+The violet pills are the job status the dashboard shows. All four agents run their tool loops at the same time.
+
 1. **Gateway** verifies the `X-Hub-Signature-256` HMAC, fetches PR files and patches from the GitHub API, dedupes
    redeliveries per head SHA (`SETNX`), stores the job in Redis and publishes it.
 2. **Agents.** Each role has its own consumer group, so every role sees every job while replicas within a role
@@ -68,6 +59,8 @@ flowchart LR
    * tools: `get_callers`, `find_tests`, `search_code`, `search_docs`, `read_snippet`. Parallel tool calls run
      concurrently; changed files are read at the PR head, everything else from the indexed base
    * the last turn disables tools, and the final answer is **schema-constrained JSON** (structured outputs)
+
+   ![Agent tool loop](docs/img/arch/04-agent-tool-loop.svg)
 3. **Aggregator** joins results per job in Redis (it survives restarts and runs as several replicas). It clusters
    near-duplicates by file, ±3 lines, and category or text similarity. When independent agents agree, the merged
    finding's confidence goes up. A deadline sweeper flushes partial results if an agent never reports.
@@ -89,8 +82,13 @@ flowchart LR
 | How does the rest of the codebase handle X? | vectors: hybrid dense (BGE-small) + sparse (BM25) search, RRF fusion |
 | Does this violate a team convention? | vectors over repo docs (CONTRIBUTING, ADRs) |
 
-Vector search can't answer "who calls this" reliably, and a graph can't answer "find similar code", so each tool
-is backed by the structure that answers it. The index is built once per push to the default branch (incremental:
+![Code graph around compute_tax](docs/img/arch/06-code-graph-impact.svg)
+
+Seeded case 05 above: `compute_tax` gains a required parameter. The graph walks backwards from the edited function.
+It finds `order_total`, which still calls it with two arguments and isn't in the diff, then `checkout` one hop
+further, plus the two tests that reach it. This impact report goes at the top of every agent's prompt. Vector search can't answer
+"who calls this" reliably, and a graph can't answer "find similar code", so each tool is backed by the structure
+that answers it. The index is built once per push to the default branch (incremental:
 only changed paths are re-embedded). Chunks are AST-aligned and tile each file completely, so `read_snippet`
 can rebuild any line range from the index without cloning the repo at review time.
 
@@ -185,6 +183,9 @@ make k8s-up    # kind + Strimzi (Kafka, KRaft) + KEDA + dev overlay; gateway on 
   * **KEDA `ScaledObject`s that scale each agent role on its consumer-group lag**. Max replicas equals the
     partition count.
 * **Measured on kind** (single node, 6 vCPU / 10 GB): a burst of 40 PRs pushed consumer lag to 12 per replica.
+
+  ![Measured KEDA burst](docs/img/arch/11-keda-burst-measured.svg)
+
   KEDA scaled every agent tier from 1 to 6 replicas within about 20 s, and the backlog drained in about 50 s.
   This run used the offline LLM with 2 s of simulated latency. Repeat it with the burst loop in
   [docs/DEMO.md](docs/DEMO.md#d-kubernetes).
@@ -299,6 +300,7 @@ src/graphreview/
   indexer/     clone, Graphify, chunk, embed   eval/       benchmark harness
   pipeline.py  all of the above in one process (demo, eval, e2e tests)
 deploy/        k8s (kustomize base + overlays), kind, Prometheus, Grafana
+docs/          architecture guide, demo runbook, diagrams-as-code (docs/diagrams/build.py → img/arch/*.svg)
 eval/          fixture repo + seeded-bug cases
 tests/         unit + in-process end-to-end tests (no network)
 ```

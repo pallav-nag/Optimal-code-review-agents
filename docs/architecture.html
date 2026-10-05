@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphReview Inside Out</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* Layout: engineering field guide — sticky section index on the left at wide widths, a 70ch text column, figures run the full content width */
+:root {
+  --paper: #f5f6f3; --panel: #ffffff; --wash: #eceee9; --rule: #d6dbd4;
+  --ink: #17201c; --ink-2: #46524c; --ink-3: #6a756f;
+  --kafka: #0b6973; --kafka-wash: #dcefef;
+  --llm: #9a4c0c; --llm-wash: #fbece0;
+  --store: #5447a6; --store-wash: #ebe9f8;
+  --ok: #1c7a3d; --bad: #b42318; --bad-wash: #fbe9e7;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101513; --panel: #161d1a; --wash: #1d2521; --rule: #2c3631;
+    --ink: #e4eae6; --ink-2: #b3beb8; --ink-3: #8a958f;
+    --kafka: #5cc6d0; --kafka-wash: #11292c;
+    --llm: #eba35f; --llm-wash: #2c2016;
+    --store: #a99ef0; --store-wash: #211f34;
+    --ok: #5cc785; --bad: #ff8b80; --bad-wash: #331a18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101513; --panel: #161d1a; --wash: #1d2521; --rule: #2c3631;
+  --ink: #e4eae6; --ink-2: #b3beb8; --ink-3: #8a958f;
+  --kafka: #5cc6d0; --kafka-wash: #11292c;
+  --llm: #eba35f; --llm-wash: #2c2016;
+  --store: #a99ef0; --store-wash: #211f34;
+  --ok: #5cc785; --bad: #ff8b80; --bad-wash: #331a18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--body); }
+.page { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; max-width: 1240px; margin: 0 auto;
+        padding-inline: 24px; padding-block: 40px 96px; }
+@media (max-width: 1000px) { .page { grid-template-columns: minmax(0, 1fr); gap: 0; padding-inline: 16px; padding-block: 24px 64px; } }
+
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13.5px; }
+nav.toc .k { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+nav.toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--rule); }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--ink); border-left-color: var(--kafka); outline: none; }
+@media (max-width: 1000px) {
+  nav.toc { position: static; margin-bottom: 32px; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+main { min-width: 0; }
+header.hero { margin-bottom: 48px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--kafka); margin: 0 0 8px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(36px, 6vw, 58px); line-height: 1.02; letter-spacing: -.02em; margin: 0 0 18px; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 3.4vw, 34px); line-height: 1.1; letter-spacing: -.01em; margin: 0 0 14px; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 20px; margin: 32px 0 8px; text-wrap: balance; }
+p, ul, ol.steps { max-width: 70ch; }
+p { margin: 0 0 14px; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 62ch; }
+code { font-family: var(--mono); font-size: .86em; background: var(--wash); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 14px; color: var(--ink-2); }
+.facts b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+
+section { padding-top: 56px; border-top: 1px solid var(--rule); margin-top: 56px; scroll-margin-top: 16px; }
+section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+
+figure { margin: 24px 0 28px; }
+figcaption { font-size: 14px; color: var(--ink-3); margin-top: 10px; max-width: 80ch; }
+figcaption b { color: var(--ink-2); font-weight: 600; }
+.scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; }
+.scroll svg { display: block; width: 100%; height: auto; }
+
+/* svg vocabulary */
+svg text { font-family: var(--body); }
+.d-box { fill: var(--panel); stroke: var(--ink-3); stroke-width: 1.2; }
+.d-llm { fill: var(--llm-wash); stroke: var(--llm); stroke-width: 1.2; }
+.d-store { fill: var(--store-wash); stroke: var(--store); stroke-width: 1.2; }
+.d-cell { fill: var(--kafka-wash); stroke: var(--kafka); stroke-width: 1.2; }
+.d-msg { fill: var(--kafka); }
+.d-bad { fill: var(--bad-wash); stroke: var(--bad); stroke-width: 1.2; }
+.d-group { fill: transparent; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.d-loop { fill: var(--llm-wash); stroke: var(--llm); stroke-width: 1; stroke-dasharray: 3 3; }
+.d-pill { fill: var(--store-wash); stroke: var(--store); stroke-width: 1; }
+.t-title { fill: var(--ink); font-size: 13.5px; font-weight: 600; }
+.t-sub { fill: var(--ink-2); font-size: 11.5px; }
+.t-note { fill: var(--ink-3); font-size: 11px; }
+.t-mono { font-family: var(--mono); }
+.t-kafka { fill: var(--kafka); font-family: var(--mono); font-size: 11.5px; font-weight: 500; }
+.t-kafka-s { fill: var(--kafka); font-family: var(--mono); }
+.t-store { fill: var(--store); font-size: 11px; font-weight: 500; }
+.t-ok { fill: var(--ok); font-size: 11.5px; font-weight: 600; }
+.t-groupt { fill: var(--ink-2); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.t-lane { fill: var(--ink); font-size: 11.5px; font-weight: 600; }
+.t-seq { fill: var(--ink-2); font-size: 10.5px; }
+.t-pill { fill: var(--store); font-size: 10.5px; font-weight: 600; }
+.t-axis { fill: var(--ink-3); font-size: 11px; font-family: var(--mono); }
+.e { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+.e-kafka { stroke: var(--kafka); stroke-width: 2; }
+.e-tool { stroke-dasharray: 5 4; }
+.e-llm { stroke: var(--llm); stroke-dasharray: 5 4; }
+.e-store { stroke: var(--store); }
+.e-ok { stroke: var(--ok); }
+.e-bad { stroke: var(--bad); }
+.e-ret { stroke-dasharray: 3 3; stroke: var(--ink-3); }
+.e-faded { stroke: var(--ink-3); stroke-dasharray: 2 3; }
+.m-ink { fill: var(--ink-2); } .m-kafka { fill: var(--kafka); } .m-llm { fill: var(--llm); }
+.m-bad { fill: var(--bad); } .m-store { fill: var(--store); } .m-ok { fill: var(--ok); }
+.lifeline { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.ring { fill: none; stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.n-hit { fill: var(--llm); stroke: var(--panel); stroke-width: 3; }
+.n-d1, .n-d2 { fill: var(--kafka); stroke: var(--panel); stroke-width: 2; }
+.n-t { fill: var(--ok); stroke: var(--panel); stroke-width: 2; }
+.n-out { fill: var(--panel); stroke: var(--ink-3); stroke-width: 1.5; }
+.grid { stroke: var(--rule); stroke-width: 1; }
+.axis { stroke: var(--ink-3); stroke-width: 1; }
+.series { fill: none; stroke: var(--kafka); stroke-width: 2; stroke-linejoin: round; }
+.pt { fill: var(--kafka); stroke: var(--panel); stroke-width: 2; }
+.pt:hover { r: 6.5; }
+
+/* interactive system map + component cards */
+.node { cursor: pointer; }
+.node:hover rect, .node:focus-visible rect { stroke-width: 2.2; }
+.node:focus-visible { outline: none; }
+.node.sel > rect { stroke: var(--ink); stroke-width: 2.6; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; margin-top: 12px; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; min-width: 0; scroll-margin-top: 24px; transition: box-shadow .3s, border-color .3s; }
+.card:focus { outline: none; }
+.card.flash { border-color: var(--kafka); box-shadow: 0 0 0 3px var(--kafka-wash); }
+.card .kind { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
+.k-ext { color: var(--ink-3); } .k-llm { color: var(--llm); } .k-store { color: var(--store); } .k-svc { color: var(--kafka); }
+.card h4 { font-family: var(--display); font-weight: 600; font-size: 19px; margin: 0 0 4px; }
+.card .what { color: var(--ink-2); font-size: 14.5px; margin: 0 0 8px; }
+.card ul { padding-left: 18px; margin: 0 0 12px; font-size: 14px; display: grid; gap: 5px; }
+.card dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: auto 0 10px; font-size: 12.5px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.card dt { color: var(--ink-3); }
+.card dd { margin: 0; font-family: var(--mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.card .back { align-self: flex-start; font: 500 12.5px var(--body); color: var(--ink-2); background: none; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.card .back:hover { color: var(--ink); border-color: var(--ink-3); }
+.card .back:focus-visible { outline: 2px solid var(--kafka); outline-offset: 2px; }
+
+/* status strip */
+.status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 18px; padding: 0; list-style: none; font-size: 14px; }
+.status li { display: flex; align-items: center; gap: 8px; }
+.status code { background: var(--store-wash); color: var(--store); font-weight: 500; }
+.status .arrow { color: var(--ink-3); }
+
+/* graph + report side by side */
+.pair { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+pre.report { margin: 0; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; font: 12.5px/1.65 var(--mono); color: var(--ink-2); overflow-x: auto; white-space: pre; }
+pre.report b { color: var(--ink); font-weight: 500; }
+pre.report .k { color: var(--kafka); }
+pre.report .t { color: var(--ok); }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; background: var(--panel); margin: 18px 0 24px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--mono); font-size: 11.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); background: var(--wash); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td code { white-space: nowrap; }
+.yes { color: var(--ok); font-weight: 600; white-space: nowrap; }
+.no { color: var(--ink-3); white-space: nowrap; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 6px; white-space: nowrap; }
+.tag.llm { background: var(--llm-wash); color: var(--llm); }
+.tag.graph { background: var(--kafka-wash); color: var(--kafka); }
+.tag.doc { background: var(--store-wash); color: var(--store); }
+.tag.rule { background: var(--wash); color: var(--ink-2); }
+
+details.data { margin-top: 10px; font-size: 14px; }
+details.data summary { cursor: pointer; color: var(--ink-2); }
+details.data table { font-size: 13px; }
+
+dl.gloss { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 12px 24px; margin: 18px 0 0; max-width: 92ch; }
+dl.gloss dt { font-weight: 600; }
+dl.gloss dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 640px) { dl.gloss { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } dl.gloss dd { margin-bottom: 12px; } }
+
+.callout { border-left: 3px solid var(--kafka); background: var(--panel); padding: 12px 16px; border-radius: 0 10px 10px 0; max-width: 70ch; margin: 18px 0; font-size: 15px; color: var(--ink-2); }
+a { color: var(--kafka); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+</head>
+<body>
+<div class="page">
+<nav class="toc" aria-label="Sections">
+  <p class="k">Contents</p>
+  <ol>
+    <li><a href="#system">The whole system</a></li>
+    <li><a href="#lifecycle">One review, end to end</a></li>
+    <li><a href="#kafka">Kafka fan-out</a></li>
+    <li><a href="#agent">Inside an agent</a></li>
+    <li><a href="#graphrag">GraphRAG retrieval</a></li>
+    <li><a href="#merge">Merging and judging</a></li>
+    <li><a href="#failure">When things fail</a></li>
+    <li><a href="#k8s">Kubernetes and autoscaling</a></li>
+    <li><a href="#modes">Offline mode vs Claude</a></li>
+    <li><a href="#code">Where the code lives</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Field guide · graphreview 0.2.0</p>
+  <h1>GraphReview Inside Out</h1>
+  <p class="lede">A pull request comes in, four AI and lint agents review it in parallel, a judge throws out the
+  weak findings, and one review lands on GitHub. In between, a code graph and a vector index tell the agents what
+  the diff can break. This page follows that path piece by piece.</p>
+  <ul class="facts">
+    <li><b>4</b> agents</li>
+    <li><b>7</b> Kafka topics</li>
+    <li><b>5</b> agent tools</li>
+    <li><b>2</b> stores (Redis, Qdrant)</li>
+    <li><b>11</b> seeded-bug test PRs</li>
+  </ul>
+</header>
+
+<section id="system">
+  <p class="eyebrow">Architecture</p>
+  <h2>The whole system</h2>
+  <p>The left column is the review path, top to bottom: each arrow between services is a Kafka topic. The right
+  column is the retrieval side: the indexer builds a code graph and a vector index ahead of time, and the context
+  service answers the agents' questions from them. <b>Click any box</b> to see what it does, what it stores, and
+  how it scales.</p>
+  <figure id="map">
+    <div class="scroll"><svg viewBox="0 0 920 900" role="img" aria-label="System map: GitHub webhooks enter the gateway, a job flows through Kafka topics to four agents, the aggregator, the critic and the publisher, which posts the review back to GitHub. The indexer fills Redis and Qdrant; agents query them through the context service." style="min-width:700px"><defs><marker id="f1i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f1k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f1l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f1s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f1o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><g class="node" data-node="github" tabindex="0" role="button" aria-label="GitHub"><rect x="120" y="16" width="260" height="46" rx="7" class="d-box"/><text x="250.0" y="36.5" class="t-title" text-anchor="middle">GitHub</text><text x="250.0" y="52.5" class="t-sub" text-anchor="middle">pull_request · push webhooks</text></g><path d="M250.0 62V106" class="e " marker-end="url(#f1i)"/><text x="260.0" y="89" class="t-note" text-anchor="start">POST /webhook · HMAC checked</text><g class="node" data-node="gateway" tabindex="0" role="button" aria-label="gateway"><rect x="120" y="108" width="260" height="72" rx="7" class="d-box"/><text x="250.0" y="126.5" class="t-title" text-anchor="middle">gateway</text><text x="250.0" y="142.5" class="t-sub" text-anchor="middle">verifies signature · fetches PR files</text><text x="250.0" y="157.5" class="t-sub" text-anchor="middle">dedupes by head SHA · serves dashboard</text><text x="250.0" y="172.5" class="t-store" text-anchor="middle">Redis: job, status=queued</text></g><path d="M250.0 180V238" class="e e-kafka" marker-end="url(#f1k)"/><text x="260.0" y="206" class="t-kafka" text-anchor="start">pr.review.requested</text><text x="260.0" y="221" class="t-note" text-anchor="start">key = job_id · 6 partitions</text><g class="node" data-node="agents" tabindex="0" role="button" aria-label="agents"><rect x="120" y="240" width="260" height="172" rx="9" class="d-group"/><text x="250.0" y="260" class="t-groupt" text-anchor="middle">4 agents · one consumer group each</text></g><g class="node" data-node="static" tabindex="0" role="button" aria-label="static"><rect x="130" y="272" width="116.0" height="62" rx="7" class="d-box"/><text x="188.0" y="300.5" class="t-title" text-anchor="middle">static</text><text x="188.0" y="316.5" class="t-sub" text-anchor="middle">ruff · added lines</text></g><g class="node" data-node="reviewer" tabindex="0" role="button" aria-label="reviewer"><rect x="254.0" y="272" width="116.0" height="62" rx="7" class="d-llm"/><text x="312.0" y="300.5" class="t-title" text-anchor="middle">reviewer</text><text x="312.0" y="316.5" class="t-sub" text-anchor="middle">correctness</text></g><g class="node" data-node="security" tabindex="0" role="button" aria-label="security"><rect x="130" y="342" width="116.0" height="62" rx="7" class="d-llm"/><text x="188.0" y="370.5" class="t-title" text-anchor="middle">security</text><text x="188.0" y="386.5" class="t-sub" text-anchor="middle">injection · authz</text></g><g class="node" data-node="tests" tabindex="0" role="button" aria-label="tests"><rect x="254.0" y="342" width="116.0" height="62" rx="7" class="d-llm"/><text x="312.0" y="370.5" class="t-title" text-anchor="middle">tests</text><text x="312.0" y="386.5" class="t-sub" text-anchor="middle">coverage gaps</text></g><path d="M250.0 412V468" class="e e-kafka" marker-end="url(#f1k)"/><text x="260.0" y="438" class="t-kafka" text-anchor="start">review.agent.results</text><text x="260.0" y="453" class="t-note" text-anchor="start">one result per agent</text><g class="node" data-node="aggregator" tabindex="0" role="button" aria-label="aggregator"><rect x="120" y="470" width="260" height="72" rx="7" class="d-box"/><text x="250.0" y="488.5" class="t-title" text-anchor="middle">aggregator</text><text x="250.0" y="504.5" class="t-sub" text-anchor="middle">joins results by job_id</text><text x="250.0" y="519.5" class="t-sub" text-anchor="middle">merges duplicate findings</text><text x="250.0" y="534.5" class="t-store" text-anchor="middle">Redis: partial results, deadlines</text></g><path d="M250.0 542V598" class="e e-kafka" marker-end="url(#f1k)"/><text x="260.0" y="574" class="t-kafka" text-anchor="start">review.aggregated</text><g class="node" data-node="critic" tabindex="0" role="button" aria-label="critic"><rect x="120" y="600" width="260" height="72" rx="7" class="d-llm"/><text x="250.0" y="618.5" class="t-title" text-anchor="middle">critic</text><text x="250.0" y="634.5" class="t-sub" text-anchor="middle">Claude as judge</text><text x="250.0" y="649.5" class="t-sub" text-anchor="middle">drops false positives</text><text x="250.0" y="664.5" class="t-sub" text-anchor="middle">writes summary + verdict</text></g><path d="M250.0 672V728" class="e e-kafka" marker-end="url(#f1k)"/><text x="260.0" y="704" class="t-kafka" text-anchor="start">review.completed</text><g class="node" data-node="publisher" tabindex="0" role="button" aria-label="publisher"><rect x="120" y="730" width="260" height="72" rx="7" class="d-box"/><text x="250.0" y="748.5" class="t-title" text-anchor="middle">publisher</text><text x="250.0" y="764.5" class="t-sub" text-anchor="middle">one GitHub review</text><text x="250.0" y="779.5" class="t-sub" text-anchor="middle">inline comments on diff lines</text><text x="250.0" y="794.5" class="t-store" text-anchor="middle">Redis: review, status=completed</text></g><path d="M250.0 802V848" class="e " marker-end="url(#f1i)"/><text x="260.0" y="829" class="t-note" text-anchor="start">POST /pulls/{n}/reviews</text><g class="node" data-node="github" tabindex="0" role="button" aria-label="GitHub PR · review posted"><rect x="120" y="850" width="260" height="40" rx="7" class="d-box"/><text x="250.0" y="875.0" class="t-title" text-anchor="middle">GitHub PR · review posted</text></g><path d="M580 26H614" class="e e-kafka" marker-end="url(#f1k)"/><text x="624" y="30" class="t-note" text-anchor="start">Kafka topic</text><path d="M580 44H614" class="e e-tool" marker-end="url(#f1i)"/><text x="624" y="48" class="t-note" text-anchor="start">HTTP call to the context service</text><path d="M580 62H614" class="e e-llm" marker-end="url(#f1l)"/><text x="624" y="66" class="t-note" text-anchor="start">call to the Claude API</text><rect x="580" y="78" width="16" height="12" rx="3" class="d-llm"/><text x="602" y="88" class="t-note" text-anchor="start">uses Claude</text><rect x="690" y="78" width="16" height="12" rx="3" class="d-store"/><text x="712" y="88" class="t-note" text-anchor="start">storage</text><path d="M380 144H578" class="e e-kafka" marker-end="url(#f1k)"/><text x="480.0" y="136" class="t-kafka" text-anchor="middle">repo.index.requested</text><text x="480.0" y="160" class="t-note" text-anchor="middle">push to default branch</text><g class="node" data-node="indexer" tabindex="0" role="button" aria-label="indexer"><rect x="580" y="108" width="320" height="72" rx="7" class="d-box"/><text x="740.0" y="134.0" class="t-title" text-anchor="middle">indexer</text><text x="740.0" y="150.0" class="t-sub" text-anchor="middle">clones the repo · builds the code graph</text><text x="740.0" y="165.0" class="t-sub" text-anchor="middle">chunks + embeds code and docs</text></g><g class="node" data-node="redis" tabindex="0" role="button" aria-label="Redis"><rect x="580" y="240" width="150" height="86" rx="7" class="d-store"/><text x="655.0" y="273.0" class="t-title" text-anchor="middle">Redis</text><text x="655.0" y="289.0" class="t-sub" text-anchor="middle">code graph (gzip)</text><text x="655.0" y="304.0" class="t-sub" text-anchor="middle">jobs · state · reviews</text></g><g class="node" data-node="qdrant" tabindex="0" role="button" aria-label="Qdrant"><rect x="750" y="240" width="150" height="86" rx="7" class="d-store"/><text x="825.0" y="273.0" class="t-title" text-anchor="middle">Qdrant</text><text x="825.0" y="289.0" class="t-sub" text-anchor="middle">code + doc chunks</text><text x="825.0" y="304.0" class="t-sub" text-anchor="middle">dense + sparse vectors</text></g><path d="M655 180V238" class="e e-store" marker-end="url(#f1s)"/><text x="663" y="214" class="t-note" text-anchor="start">graph.json</text><path d="M825 180V238" class="e e-store" marker-end="url(#f1s)"/><text x="833" y="214" class="t-note" text-anchor="start">vectors</text><g class="node" data-node="context" tabindex="0" role="button" aria-label="context service"><rect x="580" y="440" width="320" height="72" rx="7" class="d-box"/><text x="740.0" y="466.0" class="t-title" text-anchor="middle">context service</text><text x="740.0" y="482.0" class="t-sub" text-anchor="middle">GraphRAG API (HTTP) + MCP server</text><text x="740.0" y="497.0" class="t-sub" text-anchor="middle">impact · callers · search · snippets</text></g><path d="M655 440V328" class="e e-store" marker-end="url(#f1s)"/><text x="663" y="392" class="t-note" text-anchor="start">reads graph</text><path d="M825 440V328" class="e e-store" marker-end="url(#f1s)"/><text x="833" y="392" class="t-note" text-anchor="start">hybrid search</text><path d="M380 326H480V466H578" class="e e-tool" marker-end="url(#f1i)"/><text x="488" y="404" class="t-note" text-anchor="start">tool calls</text><path d="M380 624H520V496H578" class="e e-tool" marker-end="url(#f1i)"/><text x="528" y="566" class="t-note" text-anchor="start">pack_context</text><g class="node" data-node="claude" tabindex="0" role="button" aria-label="Claude API"><rect x="8" y="430" width="96" height="54" rx="7" class="d-llm"/><text x="56.0" y="454.5" class="t-title" text-anchor="middle">Claude API</text><text x="56.0" y="470.5" class="t-sub" text-anchor="middle">Messages</text></g><path d="M120 380H56V428" class="e e-llm" marker-end="url(#f1l)"/><path d="M120 648H56V486" class="e e-llm" marker-end="url(#f1l)"/></svg></div>
+    <figcaption><b>Review path on the left, retrieval on the right.</b> Amber boxes call Claude; violet boxes
+    store state; teal arrows are Kafka topics; dashed arrows are request/response calls. Click a box to jump to
+    its notes.</figcaption>
+  </figure>
+  <h3>Component notes</h3>
+  <div class="cards">
+<article class="card" id="c-github" tabindex="-1">
+  <p class="kind k-ext">external</p>
+  <h4>GitHub</h4>
+  <p class="what">Source of events and destination of reviews.</p>
+  <ul><li>Sends <code>pull_request</code> webhooks (opened, synchronize, reopened, ready_for_review) and <code>push</code> webhooks.</li><li>Receives exactly one review per PR head commit.</li></ul>
+  <dl><dt>Scales</dt><dd>external</dd><dt>Code</dt><dd>gateway/app.py · common/github.py</dd></dl>
+  <button type="button" class="back" data-node="github">Show on the map ↑</button>
+</article>
+<article class="card" id="c-gateway" tabindex="-1">
+  <p class="kind k-svc">service</p>
+  <h4>gateway</h4>
+  <p class="what">Front door: webhooks, REST API and the dashboard.</p>
+  <ul><li>Verifies <code>X-Hub-Signature-256</code>; refuses unsigned webhooks unless <code>ALLOW_UNSIGNED_WEBHOOKS=true</code>.</li><li>Fetches changed files + patches from the GitHub API and builds a <code>ReviewJob</code>.</li><li>Dedupes redeliveries: <code>SETNX dedupe:{repo}:{pr}:{head_sha}</code>.</li><li>Writes <code>job:{id}</code> and <code>status=queued</code> to Redis, then publishes to <code>pr.review.requested</code> keyed by job_id.</li><li>Push to the default branch publishes <code>repo.index.requested</code> with the changed paths.</li></ul>
+  <dl><dt>Scales</dt><dd>HPA on CPU, 2–6 pods</dd><dt>Code</dt><dd>src/graphreview/gateway/app.py</dd></dl>
+  <button type="button" class="back" data-node="gateway">Show on the map ↑</button>
+</article>
+<article class="card" id="c-agents" tabindex="-1">
+  <p class="kind k-svc">group of 4</p>
+  <h4>agents</h4>
+  <p class="what">Four specialists that review the same job in parallel.</p>
+  <ul><li>Each role subscribes with its own consumer group, so every role sees every job.</li><li>Replicas inside one role split the six partitions.</li><li>An agent that crashes still publishes an <code>AgentResult</code> with an error, so the aggregator never waits forever.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA on consumer lag, 1–6 pods per role</dd><dt>Code</dt><dd>src/graphreview/agents/service.py</dd></dl>
+  <button type="button" class="back" data-node="agents">Show on the map ↑</button>
+</article>
+<article class="card" id="c-static" tabindex="-1">
+  <p class="kind k-svc">agent · no LLM</p>
+  <h4>static agent</h4>
+  <p class="what">Deterministic linting, no LLM.</p>
+  <ul><li>Writes the changed <code>.py</code> files (PR head) to a temp dir and runs <code>ruff</code> with rules F, E9, B, S, ASYNC, BLE, PERF.</li><li>Keeps only diagnostics on lines the PR added.</li><li>Maps rule codes to severity (F821 undefined name → critical, S6xx → critical security …).</li><li>Its findings skip the critic: they are precise by construction.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA, lag threshold 5</dd><dt>Code</dt><dd>src/graphreview/agents/static_agent.py</dd></dl>
+  <button type="button" class="back" data-node="static">Show on the map ↑</button>
+</article>
+<article class="card" id="c-reviewer" tabindex="-1">
+  <p class="kind k-llm">agent · Claude</p>
+  <h4>reviewer agent</h4>
+  <p class="what">Correctness reviewer running the Claude tool loop.</p>
+  <ul><li>Focus: broken contracts with callers, edge cases, error handling, resource leaks, performance, documented conventions.</li><li>Effort <code>high</code>; all five tools.</li><li>Two replicas by default in compose.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA, lag threshold 2</dd><dt>Code</dt><dd>agents/llm_agent.py · agents/specs.py</dd></dl>
+  <button type="button" class="back" data-node="reviewer">Show on the map ↑</button>
+</article>
+<article class="card" id="c-security" tabindex="-1">
+  <p class="kind k-llm">agent · Claude</p>
+  <h4>security agent</h4>
+  <p class="what">Application-security reviewer, same loop.</p>
+  <ul><li>Focus: SQL/shell injection, missing authorization, secrets, unsafe deserialization, SSRF, path traversal, weak crypto.</li><li>Effort <code>high</code>; all five tools; traces input from handlers to sinks with the graph.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA, lag threshold 2</dd><dt>Code</dt><dd>agents/llm_agent.py · agents/specs.py</dd></dl>
+  <button type="button" class="back" data-node="security">Show on the map ↑</button>
+</article>
+<article class="card" id="c-tests" tabindex="-1">
+  <p class="kind k-llm">agent · Claude</p>
+  <h4>tests agent</h4>
+  <p class="what">Finds changed behaviour that no test exercises.</p>
+  <ul><li>Calls <code>find_tests</code> on changed symbols; suggests a short test sketch.</li><li>Effort <code>medium</code>; tools: find_tests, get_callers, read_snippet, search_code.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA, lag threshold 3</dd><dt>Code</dt><dd>agents/llm_agent.py · agents/specs.py</dd></dl>
+  <button type="button" class="back" data-node="tests">Show on the map ↑</button>
+</article>
+<article class="card" id="c-aggregator" tabindex="-1">
+  <p class="kind k-svc">service</p>
+  <h4>aggregator</h4>
+  <p class="what">Joins the four results for a job and merges duplicates.</p>
+  <ul><li>Stores each result in Redis hash <code>agg:{id}</code> (one field per agent, so redelivery is harmless) and per-agent progress for the dashboard.</li><li>When all expected agents reported: cluster findings (same file, ±3 lines, same category or similar text), boost confidence when agents agree, publish <code>review.aggregated</code>.</li><li>A sweeper flushes partial results after 300 s and marks missing agents <code>timeout</code>.</li><li><code>SETNX agg:done:{id}</code> makes the flush happen once across replicas.</li></ul>
+  <dl><dt>Scales</dt><dd>replicas by partition (results are keyed by job_id)</dd><dt>Code</dt><dd>src/graphreview/aggregator/service.py</dd></dl>
+  <button type="button" class="back" data-node="aggregator">Show on the map ↑</button>
+</article>
+<article class="card" id="c-critic" tabindex="-1">
+  <p class="kind k-llm">service · Claude</p>
+  <h4>critic</h4>
+  <p class="what">LLM-as-judge over the merged findings.</p>
+  <ul><li>One Claude call (effort <code>medium</code>) with the diff, packed graph context and the proposed findings.</li><li>Returns keep/drop, confidence and severity per finding id, plus a summary and verdict.</li><li>Drops anything below confidence 0.6. Static-only findings bypass it.</li></ul>
+  <dl><dt>Scales</dt><dd>KEDA, lag threshold 2</dd><dt>Code</dt><dd>src/graphreview/critic/service.py</dd></dl>
+  <button type="button" class="back" data-node="critic">Show on the map ↑</button>
+</article>
+<article class="card" id="c-publisher" tabindex="-1">
+  <p class="kind k-svc">service</p>
+  <h4>publisher</h4>
+  <p class="what">Delivers the review.</p>
+  <ul><li>Stores the <code>FinalReview</code> in Redis and sets <code>status=completed</code>.</li><li>For GitHub jobs posts one review, guarded by <code>SETNX posted:{id}</code>.</li><li>Findings on diff lines become inline comments; the rest (for example a broken caller in another file) go in the review body.</li><li>Records webhook-to-review latency.</li></ul>
+  <dl><dt>Scales</dt><dd>1–2 pods</dd><dt>Code</dt><dd>src/graphreview/publisher/service.py</dd></dl>
+  <button type="button" class="back" data-node="publisher">Show on the map ↑</button>
+</article>
+<article class="card" id="c-indexer" tabindex="-1">
+  <p class="kind k-svc">service</p>
+  <h4>indexer</h4>
+  <p class="what">Builds the two indexes the agents search.</p>
+  <ul><li>Shallow clone; the GitHub token travels as an HTTP header, never in the remote URL.</li><li>Graph: <code>graphify extract --code-only</code>, falling back to the built-in Python AST builder. Paths normalised to repo-relative.</li><li>Chunks code (AST-aligned) and docs (by heading), embeds dense + BM25, upserts into Qdrant.</li><li>On push, only changed paths are re-embedded.</li></ul>
+  <dl><dt>Scales</dt><dd>1 pod; work is per repository</dd><dt>Code</dt><dd>indexer/service.py · retrieval/graph_builder.py · retrieval/chunker.py</dd></dl>
+  <button type="button" class="back" data-node="indexer">Show on the map ↑</button>
+</article>
+<article class="card" id="c-redis" tabindex="-1">
+  <p class="kind k-store">storage</p>
+  <h4>Redis</h4>
+  <p class="what">Shared state, so services stay stateless.</p>
+  <ul><li><code>job:{id}</code>, <code>status:{id}</code>, <code>progress:{id}</code>, <code>review:{id}</code></li><li><code>agg:{id}</code> + the <code>agg:deadlines</code> sorted set</li><li>Guards: <code>dedupe:*</code>, <code>agg:done:*</code>, <code>posted:*</code></li><li><code>graph:{repo}</code> gzip blob + <code>graph:{repo}:version</code> for cache invalidation</li></ul>
+  <dl><dt>Scales</dt><dd>StatefulSet + 2 Gi volume</dd><dt>Code</dt><dd>src/graphreview/common/state.py</dd></dl>
+  <button type="button" class="back" data-node="redis">Show on the map ↑</button>
+</article>
+<article class="card" id="c-qdrant" tabindex="-1">
+  <p class="kind k-store">storage</p>
+  <h4>Qdrant</h4>
+  <p class="what">Vector store for code and doc chunks.</p>
+  <ul><li>Collection <code>code_chunks</code> with two named vectors: <code>dense</code> (cosine) and <code>sparse</code> (BM25 with IDF).</li><li>Payload per chunk: repo, path, start/end line, kind (code or doc), symbol, text.</li><li>Queries fuse a dense and a sparse prefetch with reciprocal rank fusion.</li></ul>
+  <dl><dt>Scales</dt><dd>StatefulSet + 10 Gi volume</dd><dt>Code</dt><dd>src/graphreview/retrieval/vector_store.py</dd></dl>
+  <button type="button" class="back" data-node="qdrant">Show on the map ↑</button>
+</article>
+<article class="card" id="c-context" tabindex="-1">
+  <p class="kind k-svc">service</p>
+  <h4>context service</h4>
+  <p class="what">The GraphRAG API every agent tool calls.</p>
+  <ul><li>Endpoints: <code>/v1/impact</code>, <code>callers</code>, <code>find_tests</code>, <code>search_code</code>, <code>search_docs</code>, <code>read_snippet</code>, <code>pack_context</code>.</li><li>Loads the graph from Redis and caches it per version; stateless, so it scales horizontally.</li><li>Same tools exposed over MCP (<code>graphreview mcp</code>) for Claude Code or Cursor.</li></ul>
+  <dl><dt>Scales</dt><dd>HPA on CPU, 2–8 pods</dd><dt>Code</dt><dd>context/api.py · retrieval/retriever.py · retrieval/graph.py</dd></dl>
+  <button type="button" class="back" data-node="context">Show on the map ↑</button>
+</article>
+<article class="card" id="c-claude" tabindex="-1">
+  <p class="kind k-llm">external · Claude</p>
+  <h4>Claude API</h4>
+  <p class="what">The model behind the reviewer, security, tests and critic agents.</p>
+  <ul><li>Messages API with structured output (a JSON schema), strict tool schemas, top-level prompt caching and server-side refusal fallback.</li><li>Default model <code>claude-opus-5-5</code> (<code>AGENT_MODEL</code>, <code>CRITIC_MODEL</code>).</li><li>With <code>LLM_BACKEND=fake</code> a rule engine answers instead, using the same response shape, so the whole pipeline runs without a key.</li></ul>
+  <dl><dt>Scales</dt><dd>external</dd><dt>Code</dt><dd>src/graphreview/common/llm.py</dd></dl>
+  <button type="button" class="back" data-node="claude">Show on the map ↑</button>
+</article>
+  </div>
+</section>
+
+<section id="lifecycle">
+  <p class="eyebrow">Sequence</p>
+  <h2>One review, end to end</h2>
+  <p>Each column is a participant; time runs downward. Teal arrows travel through Kafka, dashed ones are
+  replies, violet ones write to Redis. The violet pills on the right are the job's status. The dashboard's
+  pipeline stepper reads exactly these four values:</p>
+  <ul class="status">
+    <li><code>queued</code><span class="arrow">→</span></li>
+    <li><code>agents</code><span class="arrow">→</span></li>
+    <li><code>judging</code><span class="arrow">→</span></li>
+    <li><code>completed</code></li>
+  </ul>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 920 772" role="img" aria-label="Sequence of one review from webhook to posted review, with the status values the dashboard shows: queued, agents, judging, completed." style="min-width:820px"><defs><marker id="f3i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f3k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f3l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f3b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f3s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f3o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><line x1="44" y1="44" x2="44" y2="762" class="lifeline"/><rect x="2" y="10" width="84" height="32" rx="6" class="d-box"/><text x="44" y="31" class="t-lane" text-anchor="middle">GitHub</text><line x1="132" y1="44" x2="132" y2="762" class="lifeline"/><rect x="90" y="10" width="84" height="32" rx="6" class="d-box"/><text x="132" y="31" class="t-lane" text-anchor="middle">gateway</text><line x1="220" y1="44" x2="220" y2="762" class="lifeline"/><rect x="178" y="10" width="84" height="32" rx="6" class="d-cell"/><text x="220" y="31" class="t-lane" text-anchor="middle">Kafka</text><line x1="308" y1="44" x2="308" y2="762" class="lifeline"/><rect x="266" y="10" width="84" height="32" rx="6" class="d-llm"/><text x="308" y="31" class="t-lane" text-anchor="middle">agents ×4</text><line x1="396" y1="44" x2="396" y2="762" class="lifeline"/><rect x="354" y="10" width="84" height="32" rx="6" class="d-box"/><text x="396" y="31" class="t-lane" text-anchor="middle">context</text><line x1="484" y1="44" x2="484" y2="762" class="lifeline"/><rect x="442" y="10" width="84" height="32" rx="6" class="d-llm"/><text x="484" y="31" class="t-lane" text-anchor="middle">Claude</text><line x1="572" y1="44" x2="572" y2="762" class="lifeline"/><rect x="530" y="10" width="84" height="32" rx="6" class="d-box"/><text x="572" y="31" class="t-lane" text-anchor="middle">aggregator</text><line x1="660" y1="44" x2="660" y2="762" class="lifeline"/><rect x="618" y="10" width="84" height="32" rx="6" class="d-llm"/><text x="660" y="31" class="t-lane" text-anchor="middle">critic</text><line x1="748" y1="44" x2="748" y2="762" class="lifeline"/><rect x="706" y="10" width="84" height="32" rx="6" class="d-box"/><text x="748" y="31" class="t-lane" text-anchor="middle">publisher</text><line x1="836" y1="44" x2="836" y2="762" class="lifeline"/><rect x="794" y="10" width="84" height="32" rx="6" class="d-store"/><text x="836" y="31" class="t-lane" text-anchor="middle">Redis</text><rect x="296" y="262" width="24" height="100" rx="4" class="d-loop"/><text x="290" y="309.0" class="t-note" text-anchor="end">tool loop</text><text x="290" y="323.0" class="t-note" text-anchor="end">≤ 8 turns</text><path d="M48 76H126" class="e " marker-end="url(#f3i)"/><text x="88.0" y="70" class="t-seq" text-anchor="middle">PR opened (webhook)</text><path d="M128 104H50" class="e e-ret" marker-end="url(#f3i)"/><text x="88.0" y="98" class="t-seq" text-anchor="middle">GET /pulls/{n}/files</text><path d="M136 132H830" class="e e-store" marker-end="url(#f3s)"/><text x="484.0" y="126" class="t-seq" text-anchor="middle">job:{id} · status</text><rect x="844" y="123" width="70" height="18" rx="9" class="d-pill"/><text x="879" y="136" class="t-pill" text-anchor="middle">queued</text><path d="M136 160H214" class="e e-kafka" marker-end="url(#f3k)"/><text x="176.0" y="154" class="t-seq t-kafka-s" text-anchor="middle">pr.review.requested</text><path d="M224 188H302" class="e e-kafka" marker-end="url(#f3k)"/><text x="264.0" y="182" class="t-seq t-kafka-s" text-anchor="middle">deliver to 4 groups</text><path d="M312 216H390" class="e e-tool" marker-end="url(#f3i)"/><text x="352.0" y="210" class="t-seq" text-anchor="middle">impact(diff)</text><path d="M392 244H314" class="e e-ret" marker-end="url(#f3i)"/><text x="352.0" y="238" class="t-seq" text-anchor="middle">impact report</text><path d="M312 272H478" class="e e-llm" marker-end="url(#f3l)"/><text x="396.0" y="266" class="t-seq" text-anchor="middle">prompt + tools + schema</text><path d="M480 300H314" class="e e-ret" marker-end="url(#f3i)"/><text x="396.0" y="294" class="t-seq" text-anchor="middle">tool_use</text><path d="M312 328H390" class="e e-tool" marker-end="url(#f3i)"/><text x="352.0" y="322" class="t-seq" text-anchor="middle">more tool calls</text><path d="M480 356H314" class="e e-ret" marker-end="url(#f3i)"/><text x="396.0" y="350" class="t-seq" text-anchor="middle">end_turn → JSON findings</text><path d="M304 384H226" class="e e-kafka" marker-end="url(#f3k)"/><text x="264.0" y="378" class="t-seq t-kafka-s" text-anchor="middle">review.agent.results</text><path d="M224 412H566" class="e e-kafka" marker-end="url(#f3k)"/><text x="396.0" y="406" class="t-seq t-kafka-s" text-anchor="middle">4 results, same partition</text><path d="M576 440H830" class="e e-store" marker-end="url(#f3s)"/><text x="704.0" y="434" class="t-seq" text-anchor="middle">progress per agent</text><rect x="844" y="431" width="70" height="18" rx="9" class="d-pill"/><text x="879" y="444" class="t-pill" text-anchor="middle">agents</text><path d="M568 468H226" class="e e-kafka" marker-end="url(#f3k)"/><text x="396.0" y="462" class="t-seq t-kafka-s" text-anchor="middle">review.aggregated (4/4 in)</text><path d="M576 496H830" class="e e-store" marker-end="url(#f3s)"/><rect x="844" y="487" width="70" height="18" rx="9" class="d-pill"/><text x="879" y="500" class="t-pill" text-anchor="middle">judging</text><path d="M224 524H654" class="e e-kafka" marker-end="url(#f3k)"/><text x="440.0" y="518" class="t-seq t-kafka-s" text-anchor="middle">deliver</text><path d="M656 552H402" class="e e-tool" marker-end="url(#f3i)"/><text x="528.0" y="546" class="t-seq" text-anchor="middle">pack_context</text><path d="M656 580H490" class="e e-llm" marker-end="url(#f3l)"/><text x="572.0" y="574" class="t-seq" text-anchor="middle">judge findings</text><path d="M488 608H654" class="e e-ret" marker-end="url(#f3i)"/><text x="572.0" y="602" class="t-seq" text-anchor="middle">keep / drop · verdict</text><path d="M656 636H226" class="e e-kafka" marker-end="url(#f3k)"/><text x="440.0" y="630" class="t-seq t-kafka-s" text-anchor="middle">review.completed</text><path d="M224 664H742" class="e e-kafka" marker-end="url(#f3k)"/><text x="484.0" y="658" class="t-seq t-kafka-s" text-anchor="middle">deliver</text><path d="M752 692H830" class="e e-store" marker-end="url(#f3s)"/><text x="792.0" y="686" class="t-seq" text-anchor="middle">final review</text><rect x="844" y="683" width="70" height="18" rx="9" class="d-pill"/><text x="879" y="696" class="t-pill" text-anchor="middle">completed</text><path d="M744 720H50" class="e " marker-end="url(#f3i)"/><text x="396.0" y="714" class="t-seq" text-anchor="middle">POST review + inline comments</text></svg></div>
+    <figcaption><b>Four agents run the middle block at the same time.</b> Each agent's tool loop repeats
+    "ask Claude → run the tools it asked for" until Claude answers with findings, at most 8 turns. The aggregator
+    waits until all four results are in, or 300 s pass.</figcaption>
+  </figure>
+  <p>Two details make this robust. The gateway and the agents never talk to each other directly: everything
+  goes through Kafka, so any service can restart without losing work. And every Kafka message for a job is keyed
+  by its <code>job_id</code>, so all four agent results for one job land on the same partition and therefore
+  the same aggregator replica.</p>
+</section>
+
+<section id="kafka">
+  <p class="eyebrow">Messaging</p>
+  <h2>Kafka fan-out: every role sees every PR</h2>
+  <p>Kafka gives two behaviours depending on <em>consumer groups</em>. Consumers in <b>different</b> groups each
+  get every message, which is how one PR reaches all four agents without the gateway knowing they exist.
+  Consumers in the <b>same</b> group share the partitions, which is how one role scales out.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 940 330" role="img" aria-label="One Kafka topic with six partitions. The security group has one replica reading all six partitions; the reviewer group has three replicas, each owning two partitions." style="min-width:680px"><defs><marker id="f2i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f2k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f2l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f2s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f2o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="330" y="30" width="260" height="284" rx="9" class="d-box"/><text x="460" y="52" class="t-kafka" text-anchor="middle">pr.review.requested</text><text x="460" y="70" class="t-note" text-anchor="middle">6 partitions · hash(job_id) → partition</text><rect x="350" y="86" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="105" class="t-sub" text-anchor="start">partition 0</text><rect x="462" y="95" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="95" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="95" width="12" height="12" rx="2" class="d-msg"/><rect x="516" y="95" width="12" height="12" rx="2" class="d-msg"/><rect x="350" y="122" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="141" class="t-sub" text-anchor="start">partition 1</text><rect x="462" y="131" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="131" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="131" width="12" height="12" rx="2" class="d-msg"/><rect x="350" y="158" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="177" class="t-sub" text-anchor="start">partition 2</text><rect x="462" y="167" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="167" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="167" width="12" height="12" rx="2" class="d-msg"/><rect x="516" y="167" width="12" height="12" rx="2" class="d-msg"/><rect x="350" y="194" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="213" class="t-sub" text-anchor="start">partition 3</text><rect x="462" y="203" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="203" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="203" width="12" height="12" rx="2" class="d-msg"/><rect x="350" y="230" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="249" class="t-sub" text-anchor="start">partition 4</text><rect x="462" y="239" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="239" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="239" width="12" height="12" rx="2" class="d-msg"/><rect x="516" y="239" width="12" height="12" rx="2" class="d-msg"/><rect x="350" y="266" width="220" height="30" rx="5" class="d-cell"/><text x="362" y="285" class="t-sub" text-anchor="start">partition 5</text><rect x="462" y="275" width="12" height="12" rx="2" class="d-msg"/><rect x="480" y="275" width="12" height="12" rx="2" class="d-msg"/><rect x="498" y="275" width="12" height="12" rx="2" class="d-msg"/><text x="130" y="52" class="t-groupt" text-anchor="middle">group agent-security</text><text x="130" y="70" class="t-note" text-anchor="middle">1 replica reads all 6</text><rect x="30" y="86" width="200" height="210" rx="8" class="d-llm"/><text x="130" y="180" class="t-title" text-anchor="middle">replica 1</text><text x="130" y="198" class="t-sub" text-anchor="middle">owns partitions 0–5</text><text x="130" y="214" class="t-note" text-anchor="middle">own committed offsets</text><path d="M350 101H232" class="e e-kafka" marker-end="url(#f2k)"/><path d="M350 137H232" class="e e-kafka" marker-end="url(#f2k)"/><path d="M350 173H232" class="e e-kafka" marker-end="url(#f2k)"/><path d="M350 209H232" class="e e-kafka" marker-end="url(#f2k)"/><path d="M350 245H232" class="e e-kafka" marker-end="url(#f2k)"/><path d="M350 281H232" class="e e-kafka" marker-end="url(#f2k)"/><text x="800" y="52" class="t-groupt" text-anchor="middle">group agent-reviewer</text><text x="800" y="70" class="t-note" text-anchor="middle">3 replicas split the 6</text><rect x="690" y="86" width="220" height="66" rx="8" class="d-llm"/><text x="800" y="114" class="t-title" text-anchor="middle">replica 1</text><text x="800" y="132" class="t-sub" text-anchor="middle">owns partitions 0 + 1</text><path d="M570 101H688" class="e e-kafka" marker-end="url(#f2k)"/><path d="M570 137H688" class="e e-kafka" marker-end="url(#f2k)"/><rect x="690" y="158" width="220" height="66" rx="8" class="d-llm"/><text x="800" y="186" class="t-title" text-anchor="middle">replica 2</text><text x="800" y="204" class="t-sub" text-anchor="middle">owns partitions 2 + 3</text><path d="M570 173H688" class="e e-kafka" marker-end="url(#f2k)"/><path d="M570 209H688" class="e e-kafka" marker-end="url(#f2k)"/><rect x="690" y="230" width="220" height="66" rx="8" class="d-llm"/><text x="800" y="258" class="t-title" text-anchor="middle">replica 3</text><text x="800" y="276" class="t-sub" text-anchor="middle">owns partitions 4 + 5</text><path d="M570 245H688" class="e e-kafka" marker-end="url(#f2k)"/><path d="M570 281H688" class="e e-kafka" marker-end="url(#f2k)"/></svg></div>
+    <figcaption><b>Same topic, two groups.</b> agent-static and agent-tests are two more groups like these, each
+    with its own offsets. A seventh reviewer replica would sit idle: there are only six partitions to own, which
+    is why autoscaling caps at 6.</figcaption>
+  </figure>
+  <p>Delivery is <em>at least once</em>: a consumer commits its offset only after the handler has finished,
+  including publishing its own output. If a pod dies mid-review, another replica picks the message up again. That
+  means a message can occasionally be processed twice, so every consumer is written to tolerate repeats (see
+  <a href="#failure">When things fail</a>).</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Topic</th><th>Producer</th><th>Consumer group(s)</th><th>Payload</th></tr></thead>
+    <tbody>
+      <tr><td><code>pr.review.requested</code></td><td>gateway</td><td>agent-static, agent-reviewer, agent-security, agent-tests</td><td><code>ReviewJob</code>: repo, PR, diff patches, head SHA</td></tr>
+      <tr><td><code>review.agent.results</code></td><td>each agent</td><td>aggregator</td><td><code>AgentResult</code>: findings, tokens, tool counts, error</td></tr>
+      <tr><td><code>review.aggregated</code></td><td>aggregator</td><td>critic</td><td><code>AggregatedReview</code>: merged findings + job</td></tr>
+      <tr><td><code>review.completed</code></td><td>critic</td><td>publisher</td><td><code>FinalReview</code>: verdict, summary, kept + dropped findings</td></tr>
+      <tr><td><code>repo.index.requested</code></td><td>gateway</td><td>indexer</td><td><code>IndexRequest</code>: repo, ref, changed paths</td></tr>
+      <tr><td><code>repo.indexed</code></td><td>indexer</td><td>(none yet)</td><td><code>IndexResult</code>: nodes, edges, chunks, time</td></tr>
+      <tr><td><code>review.dlq</code></td><td>any worker</td><td>(you, for debugging)</td><td>the failed message + origin topic + error</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="agent">
+  <p class="eyebrow">Agents</p>
+  <h2>Inside an agent: the tool loop</h2>
+  <p>The reviewer, security and tests agents are the same engine with a different system prompt, tool list and
+  effort level. Claude doesn't get whole files. It gets the diff (with new-file line numbers in the margin, so it
+  can cite exact lines) and a short graph <em>impact report</em>, then decides what else it needs to look at.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 390" role="img" aria-label="Agent loop: build the prompt, call Claude, then either run tools and loop, parse the final JSON findings, or record an error result." style="min-width:760px"><defs><marker id="f4i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f4k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f4l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f4s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f4o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="20" y="110" width="180" height="90" rx="7" class="d-box"/><text x="110.0" y="137.5" class="t-title" text-anchor="middle">Build prompt</text><text x="110.0" y="153.5" class="t-sub" text-anchor="middle">PR title + description</text><text x="110.0" y="168.5" class="t-sub" text-anchor="middle">diff with line numbers</text><text x="110.0" y="183.5" class="t-sub" text-anchor="middle">graph impact report</text><path d="M200 155H248" class="e " marker-end="url(#f4i)"/><rect x="250" y="110" width="180" height="90" rx="7" class="d-llm"/><text x="340.0" y="137.5" class="t-title" text-anchor="middle">Call Claude</text><text x="340.0" y="153.5" class="t-sub" text-anchor="middle">role&#x27;s system prompt</text><text x="340.0" y="168.5" class="t-sub" text-anchor="middle">5 strict tools + JSON schema</text><text x="340.0" y="183.5" class="t-sub" text-anchor="middle">effort · prompt cache</text><path d="M430 155H488" class="e e-llm" marker-end="url(#f4l)"/><path d="M490 155L550 110L610 155L550 200Z" class="d-box"/><text x="550" y="152" class="t-title" text-anchor="middle">stop_reason</text><text x="550" y="168" class="t-sub" text-anchor="middle">?</text><path d="M610 155H668" class="e e-ok" marker-end="url(#f4o)"/><text x="639" y="146" class="t-note" text-anchor="middle">end_turn</text><rect x="670" y="110" width="132" height="90" rx="7" class="d-box"/><text x="736.0" y="145.0" class="t-title" text-anchor="middle">Parse findings</text><text x="736.0" y="161.0" class="t-sub" text-anchor="middle">schema-valid JSON</text><text x="736.0" y="176.0" class="t-sub" text-anchor="middle">→ Finding[]</text><path d="M802 155H823" class="e " marker-end="url(#f4i)"/><rect x="825" y="110" width="120" height="90" rx="7" class="d-box"/><text x="885.0" y="137.5" class="t-title" text-anchor="middle">AgentResult</text><text x="885.0" y="153.5" class="t-sub" text-anchor="middle">findings · usage</text><text x="885.0" y="168.5" class="t-sub" text-anchor="middle">tool counts · time</text><text x="885.0" y="183.5" class="t-sub" text-anchor="middle">→ Kafka</text><path d="M550 200V278" class="e " marker-end="url(#f4i)"/><text x="560" y="244" class="t-note" text-anchor="start">tool_use</text><rect x="460" y="280" width="180" height="90" rx="7" class="d-box"/><text x="550.0" y="307.5" class="t-title" text-anchor="middle">Run tool calls</text><text x="550.0" y="323.5" class="t-sub" text-anchor="middle">all at once (asyncio.gather)</text><text x="550.0" y="338.5" class="t-sub" text-anchor="middle">→ context service</text><text x="550.0" y="353.5" class="t-sub" text-anchor="middle">errors become is_error</text><path d="M460 325H432" class="e " marker-end="url(#f4i)"/><rect x="250" y="280" width="180" height="90" rx="7" class="d-box"/><text x="340.0" y="307.5" class="t-title" text-anchor="middle">Append to history</text><text x="340.0" y="323.5" class="t-sub" text-anchor="middle">assistant turn, verbatim</text><text x="340.0" y="338.5" class="t-sub" text-anchor="middle">+ every tool_result</text><text x="340.0" y="353.5" class="t-sub" text-anchor="middle">in one user message</text><path d="M340 280V202" class="e " marker-end="url(#f4i)"/><text x="350" y="244" class="t-note" text-anchor="start">next turn</text><text x="350" y="259" class="t-note" text-anchor="start">(last turn: tools off)</text><path d="M550 110V44H668" class="e e-bad" marker-end="url(#f4b)"/><text x="560" y="98" class="t-note" text-anchor="start">refusal · max_tokens · API error</text><rect x="670" y="14" width="275" height="60" rx="7" class="d-bad"/><text x="807.5" y="41.5" class="t-title" text-anchor="middle">AgentResult with error</text><text x="807.5" y="57.5" class="t-sub" text-anchor="middle">aggregator records it · review still completes</text></svg></div>
+    <figcaption><b>Three ways out of each turn.</b> <code>tool_use</code> loops; <code>end_turn</code> carries
+    the final answer, which is guaranteed to match the findings JSON schema; anything else becomes an error result
+    so the pipeline keeps moving.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tool</th><th>Question it answers</th><th>Backed by</th></tr></thead>
+    <tbody>
+      <tr><td><code>get_callers</code></td><td>Who calls this function, 1–3 hops out, and what does it call?</td><td><span class="tag graph">code graph</span></td></tr>
+      <tr><td><code>find_tests</code></td><td>Which tests exercise this symbol?</td><td><span class="tag graph">code graph</span></td></tr>
+      <tr><td><code>search_code</code></td><td>Where else does the codebase do something similar?</td><td><span class="tag doc">vectors</span> code chunks</td></tr>
+      <tr><td><code>search_docs</code></td><td>What do this repo's own docs say the rule is?</td><td><span class="tag doc">vectors</span> doc chunks</td></tr>
+      <tr><td><code>read_snippet</code></td><td>Show me lines 40–80 of this file.</td><td>PR head for changed files, index for the rest</td></tr>
+    </tbody>
+  </table></div>
+  <p>A few deliberate choices in the loop:</p>
+  <ul>
+    <li><b>Parallel tool calls run concurrently</b> and all their results go back in one message. Splitting them
+    would teach the model to stop batching.</li>
+    <li><b>The assistant turn is appended verbatim</b>, including thinking blocks, so the history is append-only
+    and the prompt cache keeps hitting on every turn.</li>
+    <li><b>The PR's text is treated as data.</b> Every system prompt says the diff and docs are untrusted and are
+    never instructions. That's a basic defence against prompt injection in a PR description.</li>
+  </ul>
+</section>
+
+<section id="graphrag">
+  <p class="eyebrow">Retrieval</p>
+  <h2>GraphRAG: a graph for structure, vectors for meaning</h2>
+  <p>"RAG" means fetching relevant context and putting it in front of the model. GraphReview does it two ways,
+  because they answer different questions. A vector search can't tell you who calls a function; a graph can't
+  find code that is merely similar. The indexer builds both from the default branch, once per push.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 230" role="img" aria-label="Indexing: one checkout feeds two lanes. The graph lane writes a code graph to Redis; the chunk lane embeds code and docs into Qdrant." style="min-width:760px"><defs><marker id="f5i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f5k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f5l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f5b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f5s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f5o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="20" y="70" width="150" height="90" rx="7" class="d-box"/><text x="95.0" y="105.0" class="t-title" text-anchor="middle">repo checkout</text><text x="95.0" y="121.0" class="t-sub" text-anchor="middle">default branch</text><text x="95.0" y="136.0" class="t-sub" text-anchor="middle">git clone --depth 1</text><path d="M170 100H196V50H228" class="e " marker-end="url(#f5i)"/><path d="M170 130H196V180H228" class="e " marker-end="url(#f5i)"/><rect x="230" y="14" width="210" height="72" rx="7" class="d-box"/><text x="335.0" y="40.0" class="t-title" text-anchor="middle">graph builder</text><text x="335.0" y="56.0" class="t-sub" text-anchor="middle">graphify extract --code-only</text><text x="335.0" y="71.0" class="t-sub" text-anchor="middle">fallback: Python AST builder</text><path d="M440 50H478" class="e " marker-end="url(#f5i)"/><rect x="480" y="14" width="190" height="72" rx="7" class="d-box"/><text x="575.0" y="40.0" class="t-title" text-anchor="middle">graph.json</text><text x="575.0" y="56.0" class="t-sub" text-anchor="middle">nodes: functions, classes, files</text><text x="575.0" y="71.0" class="t-sub" text-anchor="middle">edges: calls, imports, inherits</text><path d="M670 50H708" class="e e-store" marker-end="url(#f5s)"/><rect x="710" y="14" width="230" height="72" rx="7" class="d-store"/><text x="825.0" y="40.0" class="t-title" text-anchor="middle">Redis</text><text x="825.0" y="56.0" class="t-sub" text-anchor="middle">graph:{repo} (gzip) + version</text><text x="825.0" y="71.0" class="t-sub" text-anchor="middle">sample app: 60 nodes · 147 edges</text><rect x="230" y="144" width="210" height="72" rx="7" class="d-box"/><text x="335.0" y="170.0" class="t-title" text-anchor="middle">chunker</text><text x="335.0" y="186.0" class="t-sub" text-anchor="middle">functions / classes / module gaps</text><text x="335.0" y="201.0" class="t-sub" text-anchor="middle">markdown split by heading</text><path d="M440 180H478" class="e " marker-end="url(#f5i)"/><rect x="480" y="144" width="190" height="72" rx="7" class="d-box"/><text x="575.0" y="170.0" class="t-title" text-anchor="middle">embedder</text><text x="575.0" y="186.0" class="t-sub" text-anchor="middle">dense: BGE-small, 384-d</text><text x="575.0" y="201.0" class="t-sub" text-anchor="middle">sparse: BM25 terms</text><path d="M670 180H708" class="e e-store" marker-end="url(#f5s)"/><rect x="710" y="144" width="230" height="72" rx="7" class="d-store"/><text x="825.0" y="170.0" class="t-title" text-anchor="middle">Qdrant</text><text x="825.0" y="186.0" class="t-sub" text-anchor="middle">one point per chunk</text><text x="825.0" y="201.0" class="t-sub" text-anchor="middle">sample app: 54 chunks</text></svg></div>
+    <figcaption><b>One checkout, two indexes.</b> The numbers are from the bundled sample app. Chunks follow the
+    code's structure (a function, a class, the gaps between them), so every line of a file is in exactly one
+    chunk and <code>read_snippet</code> can rebuild any line range.</figcaption>
+  </figure>
+
+  <h3>Reading the graph: from an edited line to what it can break</h3>
+  <p>Take seeded case 05, where <code>compute_tax</code> gains a required parameter. The edited line is 21 of
+  <code>pricing.py</code>. The graph finds the innermost function around that line, then walks the edges
+  <em>backwards</em> (from callee to caller) up to two hops. Callees are skipped: changing
+  <code>compute_tax</code> can't break the functions it calls.</p>
+  <div class="pair">
+    <figure style="margin:0">
+      <div class="scroll"><svg viewBox="0 0 600 456" role="img" aria-label="Code graph around compute_tax: order_total and a test call it directly; checkout and another test reach it in two hops; apply_discount is a callee and not part of the impact." style="min-width:480px"><defs><marker id="f6i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f6k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f6l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f6b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f6s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f6o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><circle cx="300" cy="232" r="105" class="ring"/><circle cx="300" cy="232" r="185" class="ring"/><text x="300" y="121" class="t-note" text-anchor="middle">1 hop</text><text x="300" y="41" class="t-note" text-anchor="middle">2 hops</text><path d="M383.2 184.5L313.9 224.1" class="e " marker-end="url(#f6i)"/><path d="M216.8 279.5L286.1 239.9" class="e " marker-end="url(#f6i)"/><path d="M434.8 118.3L397.9 170.2" class="e " marker-end="url(#f6i)"/><path d="M467.0 292.5L397.7 189.9" class="e " marker-end="url(#f6i)"/><path d="M383.1 175.7L200.5 75.8" class="e e-faded" marker-end="url(#f6i)"/><circle cx="300" cy="232" r="11" class="n-hit"/><text x="300" y="258" class="t-title t-mono" text-anchor="middle">compute_tax</text><text x="300" y="273" class="t-note" text-anchor="middle">pricing.py:19 · edited</text><circle cx="391" cy="180" r="7" class="n-d1"/><text x="404" y="178" class="t-title t-mono" text-anchor="start">order_total</text><text x="404" y="193" class="t-note" text-anchor="start">pricing.py:24</text><circle cx="209" cy="284" r="7" class="n-t"/><text x="209" y="310" class="t-title t-mono" text-anchor="middle">test_tax_rounds_half_up</text><text x="209" y="325" class="t-note" text-anchor="middle">tests/test_pricing.py:15</text><circle cx="440" cy="111" r="7" class="n-d2"/><text x="453" y="109" class="t-title t-mono" text-anchor="start">checkout</text><text x="453" y="124" class="t-note" text-anchor="start">api.py:27</text><circle cx="472" cy="300" r="7" class="n-t"/><text x="472" y="326" class="t-title t-mono" text-anchor="middle">test_order_total</text><text x="472" y="341" class="t-note" text-anchor="middle">tests/test_pricing.py:19</text><circle cx="190" cy="70" r="7" class="n-out"/><text x="177" y="68" class="t-sub t-mono" text-anchor="end">apply_discount</text><text x="177" y="83" class="t-note" text-anchor="end">callee: not in the impact</text><text x="300" y="446" class="t-note" text-anchor="middle">arrows point from caller to callee</text></svg></div>
+    </figure>
+    <pre class="report" aria-label="Impact report text given to the agents"><b>CHANGED SYMBOLS</b> (graph nodes enclosing the edited lines):
+  compute_tax [function] @ shopapp/pricing.py:19
+<b>DEPENDENTS</b> (reverse deps, ≤2 hops) — code that may break:
+  <span class="k">[d1]</span> order_total [function] @ shopapp/pricing.py:24
+  <span class="k">[d1]</span> test_tax_rounds_half_up @ tests/test_pricing.py:15
+  <span class="k">[d2]</span> checkout [function] @ shopapp/api.py:27
+  <span class="k">[d2]</span> test_order_total @ tests/test_pricing.py:19
+<b>TESTS REACHING THE CHANGE:</b>
+  <span class="t">test_tax_rounds_half_up</span> @ tests/test_pricing.py:15
+  <span class="t">test_order_total</span> @ tests/test_pricing.py:19</pre>
+  </div>
+  <p style="margin-top:16px">The right panel is the actual text the agents receive at the top of their prompt
+  (it's also the "What the code graph saw" card on the dashboard). With it, Claude can see that
+  <code>order_total</code> still calls <code>compute_tax(discounted, region)</code> with two arguments. That
+  file isn't in the diff, so a diff-only reviewer would never look at it.</p>
+
+  <h3>Hybrid search: meaning and exact words</h3>
+  <p>For "how does this repo handle X" questions, each chunk is stored with two vectors. The <b>dense</b> one
+  (BGE-small, 384 numbers) captures meaning, so "integer cents" finds text about money. The <b>sparse</b> one
+  (BM25) scores exact words, which matters for identifiers like <code>compute_tax</code>. Qdrant runs both
+  searches and merges the rankings with reciprocal rank fusion.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 220" role="img" aria-label="Hybrid search: one query is ranked twice, by meaning and by exact words, and the two rankings are fused so results strong in both come first." style="min-width:760px"><defs><marker id="f7i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f7k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f7l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f7b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f7s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f7o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="20" y="70" width="200" height="80" rx="7" class="d-box"/><text x="120.0" y="100.0" class="t-title" text-anchor="middle">search_docs</text><text x="120.0" y="116.0" class="t-sub" text-anchor="middle">“money must be</text><text x="120.0" y="131.0" class="t-sub" text-anchor="middle">integer cents”</text><path d="M220 100H250V52H278" class="e " marker-end="url(#f7i)"/><path d="M220 120H250V168H278" class="e " marker-end="url(#f7i)"/><rect x="280" y="10" width="300" height="84" rx="7" class="d-box"/><text x="430.0" y="34.5" class="t-title" text-anchor="middle">dense ranking (meaning)</text><text x="430.0" y="50.5" class="t-sub t-mono" text-anchor="middle">1  CONTRIBUTING.md · Money</text><text x="430.0" y="65.5" class="t-sub t-mono" text-anchor="middle">2  pricing.py · compute_tax</text><text x="430.0" y="80.5" class="t-sub t-mono" text-anchor="middle">3  pricing.py · apply_discount</text><rect x="280" y="126" width="300" height="84" rx="7" class="d-box"/><text x="430.0" y="150.5" class="t-title" text-anchor="middle">sparse ranking (exact words)</text><text x="430.0" y="166.5" class="t-sub t-mono" text-anchor="middle">1  CONTRIBUTING.md · Money</text><text x="430.0" y="181.5" class="t-sub t-mono" text-anchor="middle">2  CONTRIBUTING.md · Passwords</text><text x="430.0" y="196.5" class="t-sub t-mono" text-anchor="middle">3  models.py · Product</text><path d="M580 52H610V100H638" class="e " marker-end="url(#f7i)"/><path d="M580 168H610V120H638" class="e " marker-end="url(#f7i)"/><rect x="640" y="60" width="300" height="100" rx="7" class="d-store"/><text x="790.0" y="92.5" class="t-title" text-anchor="middle">reciprocal rank fusion</text><text x="790.0" y="108.5" class="t-sub t-mono" text-anchor="middle">score = Σ 1 / (k + rank)</text><text x="790.0" y="123.5" class="t-sub" text-anchor="middle">ranked high in both → wins</text><text x="790.0" y="138.5" class="t-sub" text-anchor="middle">returns path:lines + text</text></svg></div>
+    <figcaption><b>Illustrative ranking.</b> The two lists differ; the doc section that ranks high in both comes
+    out first. In the tests, this query returns the CONTRIBUTING.md "Money" section first.</figcaption>
+  </figure>
+</section>
+
+<section id="merge">
+  <p class="eyebrow">Aggregation</p>
+  <h2>Merging duplicates, then judging</h2>
+  <p>Four agents looking at the same diff often flag the same problem. The aggregator clusters findings that sit
+  in the same file within three lines and share a category, or have similar wording. Each cluster keeps its most
+  severe, most confident finding and records which agents agreed. Agreement is evidence, so confidence rises:</p>
+  <p><code>confidence = 1 − (1 − c) × 0.6^(agents − 1)</code></p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 300" role="img" aria-label="Merging: two findings on repository.py line 8 from different agents become one with higher confidence; the critic then keeps or drops each merged finding and sets the verdict." style="min-width:760px"><defs><marker id="f8i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f8k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f8l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f8b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f8s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f8o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><text x="150" y="18" class="t-groupt" text-anchor="middle">raw findings (4)</text><rect x="20" y="30" width="260" height="56" rx="7" class="d-llm"/><text x="150.0" y="55.5" class="t-title" text-anchor="middle">security · repository.py:8</text><text x="150.0" y="71.5" class="t-sub" text-anchor="middle">SQL injection · critical · 0.75</text><rect x="20" y="96" width="260" height="56" rx="7" class="d-box"/><text x="150.0" y="121.5" class="t-title" text-anchor="middle">static · repository.py:8</text><text x="150.0" y="137.5" class="t-sub" text-anchor="middle">S608 string-built SQL · critical · 0.90</text><rect x="20" y="162" width="260" height="56" rx="7" class="d-llm"/><text x="150.0" y="187.5" class="t-title" text-anchor="middle">reviewer · utils.py:16</text><text x="150.0" y="203.5" class="t-sub" text-anchor="middle">division by zero · warning · 0.75</text><rect x="20" y="228" width="260" height="56" rx="7" class="d-llm"/><text x="150.0" y="253.5" class="t-title" text-anchor="middle">tests · utils.py:15</text><text x="150.0" y="269.5" class="t-sub" text-anchor="middle">no test for average() · info · 0.60</text><text x="470" y="18" class="t-groupt" text-anchor="middle">after merging (3)</text><rect x="340" y="43" width="260" height="96" rx="7" class="d-box"/><text x="470.0" y="81.0" class="t-title" text-anchor="middle">repository.py:8 · critical</text><text x="470.0" y="97.0" class="t-sub" text-anchor="middle">S608, reported by static + security</text><text x="470.0" y="112.0" class="t-ok" text-anchor="middle">confidence 0.90 → 0.94</text><rect x="340" y="162" width="260" height="56" rx="7" class="d-box"/><text x="470.0" y="187.5" class="t-title" text-anchor="middle">utils.py:16 · warning</text><text x="470.0" y="203.5" class="t-sub" text-anchor="middle">division by zero · reviewer</text><rect x="340" y="228" width="260" height="56" rx="7" class="d-box"/><text x="470.0" y="253.5" class="t-title" text-anchor="middle">utils.py:15 · info</text><text x="470.0" y="269.5" class="t-sub" text-anchor="middle">no test for average() · tests</text><path d="M280 58H310V80H338" class="e " marker-end="url(#f8i)"/><path d="M280 124H310V102H338" class="e " marker-end="url(#f8i)"/><path d="M280 190H338" class="e " marker-end="url(#f8i)"/><path d="M280 256H338" class="e " marker-end="url(#f8i)"/><text x="312" y="150" class="t-note" text-anchor="start">same file, ±3 lines</text><text x="800" y="18" class="t-groupt" text-anchor="middle">critic</text><rect x="660" y="30" width="280" height="254" rx="7" class="d-llm"/><text x="800.0" y="94.5" class="t-title" text-anchor="middle">judges each merged finding</text><text x="800.0" y="110.5" class="t-sub" text-anchor="middle">kept if the judge agrees</text><text x="800.0" y="125.5" class="t-sub" text-anchor="middle">and confidence ≥ 0.6</text><text x="800.0" y="140.5" class="t-sub" text-anchor="middle">severity can move up or down</text><text x="800.0" y="155.5" class="t-sub" text-anchor="middle">static-only findings skip this</text><text x="800.0" y="170.5" class="t-sub" text-anchor="middle"></text><text x="800.0" y="185.5" class="t-title" text-anchor="middle">verdict</text><text x="800.0" y="200.5" class="t-sub" text-anchor="middle">critical kept → request changes</text><text x="800.0" y="215.5" class="t-sub" text-anchor="middle">anything else kept → comment</text><text x="800.0" y="230.5" class="t-sub" text-anchor="middle">nothing kept → approve</text><path d="M600 91H658" class="e e-llm" marker-end="url(#f8l)"/><path d="M600 190H658" class="e e-llm" marker-end="url(#f8l)"/><path d="M600 256H658" class="e e-llm" marker-end="url(#f8l)"/></svg></div>
+    <figcaption><b>A real run of seeded case 01 plus two more findings.</b> The security agent and ruff both
+    flagged line 8, so they merge into one finding tagged with both agents, as the dashboard shows. The tests
+    finding on line 15 stays separate from the reviewer's on line 16: different category, different
+    wording.</figcaption>
+  </figure>
+  <p>The <b>critic</b> is a second Claude pass with a different job: be skeptical. It sees the diff, the packed
+  graph context and the proposed findings, and returns a keep/drop decision, a confidence and a severity for
+  each one, plus the summary and verdict. This "LLM-as-judge" step is what keeps a multi-agent system from
+  burying a PR in plausible-sounding noise. Rejected findings aren't deleted; the dashboard lists them under
+  "Rejected by critic".</p>
+</section>
+
+<section id="failure">
+  <p class="eyebrow">Reliability</p>
+  <h2>When things fail</h2>
+  <p>Every worker runs the same consume loop. A message is processed one at a time per consumer, and its offset
+  is committed only after the handler succeeds or the message has been parked in the dead-letter topic.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 250" role="img" aria-label="Message handling: success commits the offset; an exception retries up to three times with backoff, then the message goes to the dead-letter topic and the offset is committed." style="min-width:760px"><defs><marker id="f9i" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="f9k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="f9l" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="f9b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="f9s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="f9o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="20" y="40" width="160" height="60" rx="7" class="d-box"/><text x="100.0" y="67.5" class="t-title" text-anchor="middle">poll one message</text><text x="100.0" y="83.5" class="t-sub" text-anchor="middle">max_poll_records = 1</text><path d="M180 70H218" class="e " marker-end="url(#f9i)"/><rect x="220" y="40" width="170" height="60" rx="7" class="d-box"/><text x="305.0" y="67.5" class="t-title" text-anchor="middle">run handler</text><text x="305.0" y="83.5" class="t-sub" text-anchor="middle">agent, aggregator, …</text><path d="M390 70H758" class="e e-ok" marker-end="url(#f9o)"/><text x="575" y="62" class="t-note" text-anchor="middle">success</text><rect x="760" y="40" width="180" height="60" rx="7" class="d-box"/><text x="850.0" y="67.5" class="t-title" text-anchor="middle">commit offset</text><text x="850.0" y="83.5" class="t-sub" text-anchor="middle">only after success</text><path d="M305 100V148" class="e e-bad" marker-end="url(#f9b)"/><text x="315" y="128" class="t-note" text-anchor="start">exception</text><path d="M235 190L305 150L375 190L305 230Z" class="d-box"/><text x="305" y="186" class="t-title" text-anchor="middle">attempt</text><text x="305" y="202" class="t-sub" text-anchor="middle">&lt; 3 ?</text><path d="M235 190H182" class="e " marker-end="url(#f9i)"/><text x="208" y="182" class="t-note" text-anchor="middle">yes</text><rect x="30" y="162" width="150" height="56" rx="7" class="d-box"/><text x="105.0" y="187.5" class="t-title" text-anchor="middle">back off</text><text x="105.0" y="203.5" class="t-sub" text-anchor="middle">2 s, then 4 s</text><path d="M105 162V130H260V102" class="e " marker-end="url(#f9i)"/><path d="M375 190H438" class="e e-bad" marker-end="url(#f9b)"/><text x="406" y="182" class="t-note" text-anchor="middle">no</text><rect x="440" y="160" width="260" height="60" rx="7" class="d-bad"/><text x="570.0" y="187.5" class="t-title" text-anchor="middle">publish to review.dlq</text><text x="570.0" y="203.5" class="t-sub" text-anchor="middle">headers: origin_topic, service, error</text><path d="M700 190H850V102" class="e " marker-end="url(#f9i)"/></svg></div>
+    <figcaption><b>Three attempts, then the dead-letter topic.</b> Either way the offset is committed, so one bad
+    message can't block a partition forever.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>What goes wrong</th><th>What happens</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>GitHub redelivers a webhook, or two pushes arrive fast</td><td>Same repo + PR + head SHA → returns the existing job id (<code>SETNX dedupe:…</code>)</td><td>gateway</td></tr>
+      <tr><td>Kafka isn't up yet when a pod starts</td><td>Client retries with backoff for ~7 minutes instead of crash-looping</td><td>common/bus.py</td></tr>
+      <tr><td>Claude refuses, hits max_tokens, or the API errors</td><td>SDK retries 429/5xx 4×; otherwise the agent publishes a result with <code>error</code></td><td>agents</td></tr>
+      <tr><td>An agent never reports</td><td>Deadline sweeper flushes partial results after 300 s; agent shown as <code>timeout</code></td><td>aggregator</td></tr>
+      <tr><td>The same agent result arrives twice</td><td>Stored per agent in a hash, so the second write is a no-op; flush guarded by <code>SETNX agg:done:…</code></td><td>aggregator</td></tr>
+      <tr><td>Posting to GitHub fails</td><td>Guard key removed so the retry can post; after 3 failures → <code>review.dlq</code></td><td>publisher</td></tr>
+      <tr><td>A pod is killed mid-review</td><td>Offset not committed → another replica re-reads the message; 300 s grace period lets most reviews finish</td><td>Kubernetes</td></tr>
+      <tr><td>A PR description says "ignore previous instructions…"</td><td>Prompts frame all PR content as untrusted data; the output schema limits what the model can return</td><td>agents, critic</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="k8s">
+  <p class="eyebrow">Deployment</p>
+  <h2>Kubernetes and autoscaling</h2>
+  <p>Each service is its own Deployment, so each one scales on its own signal. The HTTP services (gateway,
+  context) scale on CPU, the standard way. The agents don't use much CPU, though: they spend most of their time
+  waiting on Claude. So CPU says nothing about how far behind they are. The right signal is <em>consumer
+  lag</em>, the number of messages waiting in their group, and KEDA turns that into replicas.</p>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 960 170" role="img" aria-label="KEDA loop: consumer lag in Kafka drives the desired replica count, capped at six, and the added pods drain the lag." style="min-width:760px"><defs><marker id="fai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ink"/></marker><marker id="fak" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-kafka"/></marker><marker id="fal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-llm"/></marker><marker id="fab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-bad"/></marker><marker id="fas" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-store"/></marker><marker id="fao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ok"/></marker></defs><rect x="20" y="30" width="190" height="72" rx="7" class="d-cell"/><text x="115.0" y="56.0" class="t-title" text-anchor="middle">Kafka</text><text x="115.0" y="72.0" class="t-sub" text-anchor="middle">consumer-group lag</text><text x="115.0" y="87.0" class="t-sub" text-anchor="middle">messages not yet committed</text><path d="M210 66H258" class="e " marker-end="url(#fai)"/><text x="234" y="58" class="t-note" text-anchor="middle">read</text><rect x="260" y="30" width="210" height="72" rx="7" class="d-box"/><text x="365.0" y="56.0" class="t-title" text-anchor="middle">KEDA scaler</text><text x="365.0" y="72.0" class="t-sub" text-anchor="middle">desired = lag ÷ threshold</text><text x="365.0" y="87.0" class="t-sub" text-anchor="middle">threshold 2 (Claude agents)</text><path d="M470 66H518" class="e " marker-end="url(#fai)"/><rect x="520" y="30" width="190" height="72" rx="7" class="d-box"/><text x="615.0" y="56.0" class="t-title" text-anchor="middle">HPA</text><text x="615.0" y="72.0" class="t-sub" text-anchor="middle">min 1 · max 6 replicas</text><text x="615.0" y="87.0" class="t-sub" text-anchor="middle">6 = partition count</text><path d="M710 66H758" class="e " marker-end="url(#fai)"/><rect x="760" y="30" width="180" height="72" rx="7" class="d-llm"/><text x="850.0" y="56.0" class="t-title" text-anchor="middle">Deployment</text><text x="850.0" y="72.0" class="t-sub" text-anchor="middle">agent pods</text><text x="850.0" y="87.0" class="t-sub" text-anchor="middle">join the consumer group</text><path d="M850 102V140H115V104" class="e e-kafka" marker-end="url(#fak)"/><text x="480" y="158" class="t-note" text-anchor="middle">more consumers drain the lag; after 300 s quiet KEDA scales back to 1</text></svg></div>
+    <figcaption><b>The control loop.</b> KEDA polls Kafka every 30 s and drives a standard
+    HorizontalPodAutoscaler.</figcaption>
+  </figure>
+  <h3>Measured: 40 PRs at once on a laptop cluster</h3>
+  <figure>
+    <div class="scroll"><svg viewBox="0 0 930 230" role="img" aria-label="Measured on kind: replicas rose from 1 to 5 within 10 seconds and 6 within 20 seconds; lag per replica fell from 12 to 0 by about 50 seconds." style="min-width:720px"><text x="44" y="18" class="t-title" text-anchor="start">Agent replicas (agent-reviewer)</text><line x1="44" x2="424" y1="194.0" y2="194.0" class="grid"/><text x="36" y="198.0" class="t-axis" text-anchor="end">0</text><line x1="44" x2="424" y1="145.5" y2="145.5" class="grid"/><text x="36" y="149.5" class="t-axis" text-anchor="end">2</text><line x1="44" x2="424" y1="97.0" y2="97.0" class="grid"/><text x="36" y="101.0" class="t-axis" text-anchor="end">4</text><line x1="44" x2="424" y1="48.5" y2="48.5" class="grid"/><text x="36" y="52.5" class="t-axis" text-anchor="end">6</text><text x="44.0" y="214" class="t-axis" text-anchor="middle">0s</text><text x="131.7" y="214" class="t-axis" text-anchor="middle">30s</text><text x="219.4" y="214" class="t-axis" text-anchor="middle">60s</text><text x="307.1" y="214" class="t-axis" text-anchor="middle">90s</text><text x="394.8" y="214" class="t-axis" text-anchor="middle">120s</text><line x1="44" x2="424" y1="194.0" y2="194.0" class="axis"/><path d="M44.0 169.8 L73.2 72.8 L102.5 48.5 L131.7 48.5 L160.9 48.5 L193.1 48.5 L222.3 48.5 L251.5 48.5 L280.8 48.5 L310.0 48.5 L339.2 48.5 L368.5 48.5 L397.7 48.5" class="series"/><circle cx="44.0" cy="169.8" r="4.5" class="pt"><title>0 s after the burst: 1 replicas</title></circle><circle cx="73.2" cy="72.8" r="4.5" class="pt"><title>10 s after the burst: 5 replicas</title></circle><circle cx="102.5" cy="48.5" r="4.5" class="pt"><title>20 s after the burst: 6 replicas</title></circle><circle cx="131.7" cy="48.5" r="4.5" class="pt"><title>30 s after the burst: 6 replicas</title></circle><circle cx="160.9" cy="48.5" r="4.5" class="pt"><title>40 s after the burst: 6 replicas</title></circle><circle cx="193.1" cy="48.5" r="4.5" class="pt"><title>51 s after the burst: 6 replicas</title></circle><circle cx="222.3" cy="48.5" r="4.5" class="pt"><title>61 s after the burst: 6 replicas</title></circle><circle cx="251.5" cy="48.5" r="4.5" class="pt"><title>71 s after the burst: 6 replicas</title></circle><circle cx="280.8" cy="48.5" r="4.5" class="pt"><title>81 s after the burst: 6 replicas</title></circle><circle cx="310.0" cy="48.5" r="4.5" class="pt"><title>91 s after the burst: 6 replicas</title></circle><circle cx="339.2" cy="48.5" r="4.5" class="pt"><title>101 s after the burst: 6 replicas</title></circle><circle cx="368.5" cy="48.5" r="4.5" class="pt"><title>111 s after the burst: 6 replicas</title></circle><circle cx="397.7" cy="48.5" r="4.5" class="pt"><title>121 s after the burst: 6 replicas</title></circle><text x="110.5" y="39.5" class="t-note" text-anchor="start">6 = partition cap</text><text x="52.0" y="161.8" class="t-note" text-anchor="start">1 before</text><text x="534" y="18" class="t-title" text-anchor="start">Lag per replica (KEDA metric)</text><line x1="534" x2="914" y1="194.0" y2="194.0" class="grid"/><text x="526" y="198.0" class="t-axis" text-anchor="end">0</text><line x1="534" x2="914" y1="146.6" y2="146.6" class="grid"/><text x="526" y="150.6" class="t-axis" text-anchor="end">4</text><line x1="534" x2="914" y1="99.2" y2="99.2" class="grid"/><text x="526" y="103.2" class="t-axis" text-anchor="end">8</text><line x1="534" x2="914" y1="51.8" y2="51.8" class="grid"/><text x="526" y="55.8" class="t-axis" text-anchor="end">12</text><text x="534.0" y="214" class="t-axis" text-anchor="middle">0s</text><text x="621.7" y="214" class="t-axis" text-anchor="middle">30s</text><text x="709.4" y="214" class="t-axis" text-anchor="middle">60s</text><text x="797.1" y="214" class="t-axis" text-anchor="middle">90s</text><text x="884.8" y="214" class="t-axis" text-anchor="middle">120s</text><line x1="534" x2="914" y1="194.0" y2="194.0" class="axis"/><path d="M563.2 51.8 L592.5 165.6 L621.7 165.6 L650.9 170.3 L683.1 194.0 L712.3 194.0 L741.5 194.0 L770.8 194.0 L800.0 194.0 L829.2 194.0 L858.5 194.0 L887.7 194.0" class="series"/><circle cx="563.2" cy="51.8" r="4.5" class="pt"><title>10 s after the burst: 12 messages per replica</title></circle><circle cx="592.5" cy="165.6" r="4.5" class="pt"><title>20 s after the burst: 2.4 messages per replica</title></circle><circle cx="621.7" cy="165.6" r="4.5" class="pt"><title>30 s after the burst: 2.4 messages per replica</title></circle><circle cx="650.9" cy="170.3" r="4.5" class="pt"><title>40 s after the burst: 2 messages per replica</title></circle><circle cx="683.1" cy="194.0" r="4.5" class="pt"><title>51 s after the burst: 0 messages per replica</title></circle><circle cx="712.3" cy="194.0" r="4.5" class="pt"><title>61 s after the burst: 0 messages per replica</title></circle><circle cx="741.5" cy="194.0" r="4.5" class="pt"><title>71 s after the burst: 0 messages per replica</title></circle><circle cx="770.8" cy="194.0" r="4.5" class="pt"><title>81 s after the burst: 0 messages per replica</title></circle><circle cx="800.0" cy="194.0" r="4.5" class="pt"><title>91 s after the burst: 0 messages per replica</title></circle><circle cx="829.2" cy="194.0" r="4.5" class="pt"><title>101 s after the burst: 0 messages per replica</title></circle><circle cx="858.5" cy="194.0" r="4.5" class="pt"><title>111 s after the burst: 0 messages per replica</title></circle><circle cx="887.7" cy="194.0" r="4.5" class="pt"><title>121 s after the burst: 0 messages per replica</title></circle><text x="572.2" y="55.8" class="t-note" text-anchor="start">12 at first sample</text><text x="689.1" y="184.0" class="t-note" text-anchor="start">drained by ~50 s</text></svg></div>
+    <figcaption><b>kind, one node, 6 vCPU / 10 GB, offline LLM with 2 s simulated latency.</b> Sampled every
+    10 s with <code>kubectl</code>. The security and tests agents followed the same curve; the critic scaled
+    separately to 4. All 41 reviews completed.</figcaption>
+    <details class="data"><summary>Show the samples</summary>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Seconds after burst</th><th>agent-reviewer replicas</th><th>Lag per replica</th></tr></thead>
+        <tbody>
+          <tr><td class="num">0</td><td class="num">1</td><td class="num">—</td></tr>
+          <tr><td class="num">10</td><td class="num">5</td><td class="num">12</td></tr>
+          <tr><td class="num">20</td><td class="num">6</td><td class="num">2.4</td></tr>
+          <tr><td class="num">30</td><td class="num">6</td><td class="num">2.4</td></tr>
+          <tr><td class="num">40</td><td class="num">6</td><td class="num">2</td></tr>
+          <tr><td class="num">51</td><td class="num">6</td><td class="num">0</td></tr>
+          <tr><td class="num">61–121</td><td class="num">6</td><td class="num">0</td></tr>
+        </tbody>
+      </table></div>
+    </details>
+  </figure>
+  <p>One more thing that run showed: a fourth critic pod stayed <em>Pending</em> because the single node's memory
+  <em>requests</em> hit 98%, though real usage was 44%. That's the scheduler working as designed. In production a
+  cluster autoscaler would add a node; on a laptop, the dev overlay lowers the requests.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Component</th><th>Docker Compose</th><th>Kubernetes</th><th>Scales on</th></tr></thead>
+    <tbody>
+      <tr><td>gateway</td><td>1 container, :8080</td><td>Deployment ×2, Service, PodDisruptionBudget</td><td>CPU (HPA, 2–6)</td></tr>
+      <tr><td>context</td><td>1 container, :8001</td><td>Deployment ×2, Service, PodDisruptionBudget</td><td>CPU (HPA, 2–8)</td></tr>
+      <tr><td>agents ×4</td><td>1 container each (reviewer ×2)</td><td>Deployment each</td><td>consumer lag (KEDA, 1–6)</td></tr>
+      <tr><td>critic</td><td>1 container</td><td>Deployment</td><td>consumer lag (KEDA, 1–6)</td></tr>
+      <tr><td>aggregator, publisher</td><td>1 container each</td><td>Deployment (prod: ×2)</td><td>fixed</td></tr>
+      <tr><td>indexer</td><td>1 container + repos volume</td><td>Deployment + 20 Gi scratch</td><td>fixed</td></tr>
+      <tr><td>Kafka</td><td><code>apache/kafka:4.3.1</code>, single node, KRaft</td><td>Strimzi <code>Kafka</code> + <code>KafkaNodePool</code> + <code>KafkaTopic</code> resources; prod: 3 brokers, replication 3</td><td>—</td></tr>
+      <tr><td>Redis</td><td><code>redis:8.8.3</code></td><td>StatefulSet + 2 Gi volume</td><td>—</td></tr>
+      <tr><td>Qdrant</td><td><code>qdrant:v1.19.1</code></td><td>StatefulSet (unprivileged) + 10 Gi volume</td><td>—</td></tr>
+      <tr><td>Prometheus, Grafana</td><td>included, dashboard provisioned</td><td>pods carry scrape annotations for your own Prometheus</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <p>The manifests also set the security baseline a reviewer would look for: pods run as non-root with a
+  read-only root filesystem, all Linux capabilities dropped and the default seccomp profile. NetworkPolicies deny
+  all ingress by default and open only the paths the pipeline uses.</p>
+</section>
+
+<section id="modes">
+  <p class="eyebrow">Two brains</p>
+  <h2>Offline mode vs Claude</h2>
+  <p><code>LLM_BACKEND</code> picks what answers the agents. <code>fake</code> is a deterministic rule engine
+  that speaks the same response format as the Claude API, including a tool call on the first turn. Everything
+  else (Kafka, the tool loop, merging, the critic step, the dashboard) runs for real. That's why the tests, CI and
+  every demo work without an API key. <code>anthropic</code> sends the same requests to Claude.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Case</th><th>Seeded bug</th><th>What it takes to catch</th><th>Offline engine</th></tr></thead>
+    <tbody>
+      <tr><td class="num">01</td><td>email lookup switched to an f-string SQL query</td><td><span class="tag rule">pattern</span></td><td class="yes">caught (security + ruff)</td></tr>
+      <tr><td class="num">02</td><td>discount computed with floats</td><td><span class="tag doc">convention</span> money is integer cents</td><td class="no">missed</td></tr>
+      <tr><td class="num">03</td><td>authorization check removed from a handler</td><td><span class="tag llm">reasoning</span> <span class="tag doc">convention</span></td><td class="no">missed</td></tr>
+      <tr><td class="num">04</td><td>payment request loses its timeout</td><td><span class="tag rule">pattern</span></td><td class="yes">caught</td></tr>
+      <tr><td class="num">05</td><td><code>compute_tax</code> gains a parameter; callers not updated</td><td><span class="tag graph">graph</span> callers outside the diff</td><td class="no">missed</td></tr>
+      <tr><td class="num">06</td><td>refund failures swallowed</td><td><span class="tag rule">pattern</span></td><td class="yes">caught</td></tr>
+      <tr><td class="num">07</td><td>PBKDF2 replaced with MD5</td><td><span class="tag rule">pattern</span></td><td class="yes">caught</td></tr>
+      <tr><td class="num">08</td><td>pagination skips the first page</td><td><span class="tag llm">reasoning</span></td><td class="no">missed</td></tr>
+      <tr><td class="num">09</td><td><code>average()</code> divides by a possibly-zero length</td><td><span class="tag rule">pattern</span></td><td class="yes">caught</td></tr>
+      <tr><td class="num">10</td><td>stock check inverted</td><td><span class="tag llm">reasoning</span></td><td class="no">missed</td></tr>
+      <tr><td class="num">11</td><td>docstring only (control: should stay clean)</td><td>—</td><td class="yes">clean</td></tr>
+    </tbody>
+  </table></div>
+  <p>The offline engine scores precision 1.0 and recall 0.5: it finds the five pattern bugs and nothing else. The
+  other five need reasoning, team conventions, or the graph. Measuring how Claude does on them, and how much the
+  graph context helps compared with sending only the diff or whole files, is what <code>make eval</code> is
+  for. That's the next step, and it needs an API key.</p>
+  <div class="callout">The eval runs each case three ways: <code>diff_only</code> (the diff alone),
+  <code>full_files</code> (the diff plus every changed file), and <code>graph_rag</code> (impact report plus
+  tools). It reports precision, recall, tokens, cost and latency for each. That ablation is what shows the graph
+  pays for itself.</div>
+</section>
+
+<section id="code">
+  <p class="eyebrow">Codebase</p>
+  <h2>Where the code lives</h2>
+  <p>Everything is one Python package, <code>src/graphreview</code>. One CLI (<code>graphreview &lt;command&gt;</code>)
+  starts any service, and two Docker images hold them all: <code>core</code> for the light services,
+  <code>rag</code> for the ones that need embedding models.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Path</th><th>What's in it</th></tr></thead>
+    <tbody>
+      <tr><td><code>common/models.py</code></td><td>Every message on the bus as a Pydantic model: ReviewJob, Finding, AgentResult, AggregatedReview, FinalReview, IndexRequest</td></tr>
+      <tr><td><code>common/bus.py</code></td><td>KafkaBus (idempotent producer, manual commits, startup retry) and MemoryBus, an in-process copy with the same consumer-group behaviour</td></tr>
+      <tr><td><code>common/worker.py</code></td><td>The shared consume → handle → retry → dead-letter → commit loop</td></tr>
+      <tr><td><code>common/state.py</code></td><td>Redis and in-memory versions of the small state API (get/set, hashes, sorted sets, SETNX)</td></tr>
+      <tr><td><code>common/llm.py</code></td><td>Claude client (structured output, caching, refusal fallback) and the offline rule engine</td></tr>
+      <tr><td><code>common/diff.py</code></td><td>Unified-diff parsing: which new-file lines were added, line-number annotation</td></tr>
+      <tr><td><code>retrieval/graph_builder.py</code></td><td>Fallback Python AST graph builder; emits Graphify's graph.json format</td></tr>
+      <tr><td><code>retrieval/graph.py</code></td><td>CodeGraph: line → symbol, callers, reverse-dependency impact, tests that reach a symbol</td></tr>
+      <tr><td><code>retrieval/chunker.py</code>, <code>embeddings.py</code>, <code>vector_store.py</code></td><td>Structure-aware chunks; dense + sparse embedders; Qdrant hybrid search</td></tr>
+      <tr><td><code>retrieval/retriever.py</code></td><td>The GraphRAG operations the tools call: impact, callers, search, snippets, packed context</td></tr>
+      <tr><td><code>context/</code></td><td>HTTP API over the retriever, its client, and the MCP server</td></tr>
+      <tr><td><code>agents/</code></td><td>Tool definitions, the three agent prompts, the tool loop, ruff agent, worker</td></tr>
+      <tr><td><code>aggregator/</code>, <code>critic/</code>, <code>publisher/</code></td><td>Join + merge + deadlines; LLM-as-judge; GitHub review rendering</td></tr>
+      <tr><td><code>gateway/</code></td><td>Webhooks, REST API, demo endpoints, and the dashboard (<code>static/index.html</code>)</td></tr>
+      <tr><td><code>indexer/</code></td><td>Clone, Graphify, chunk, embed</td></tr>
+      <tr><td><code>pipeline.py</code></td><td>All services wired together in one process, used by the demo, the eval and the end-to-end tests</td></tr>
+      <tr><td><code>eval/</code></td><td>Seeded-bug cases and the scoring harness</td></tr>
+      <tr><td><code>deploy/</code></td><td>Kubernetes manifests (base, dev, prod), kind config, Prometheus, Grafana</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="glossary">
+  <p class="eyebrow">Terms</p>
+  <h2>Glossary</h2>
+  <dl class="gloss">
+    <dt>Agent</dt><dd>An LLM in a loop with tools: it decides what to look up, looks it up, and repeats until it can answer.</dd>
+    <dt>Tool use</dt><dd>Claude replies with a structured request to call one of our functions; we run it and send back the result.</dd>
+    <dt>Structured output</dt><dd>The API constrains Claude's final answer to a JSON schema, so parsing never fails.</dd>
+    <dt>Prompt caching</dt><dd>Claude's API reuses an unchanged prompt prefix from a previous call at about a tenth of the price; each loop turn reuses all earlier turns.</dd>
+    <dt>LLM-as-judge</dt><dd>A second model call that evaluates the first one's output instead of producing new work.</dd>
+    <dt>RAG</dt><dd>Retrieval-augmented generation: fetch relevant context at question time instead of relying on what the model memorised.</dd>
+    <dt>GraphRAG</dt><dd>RAG where some of that context comes from walking a graph of relationships rather than from text similarity.</dd>
+    <dt>Code graph</dt><dd>Nodes are files, classes and functions; edges are calls, imports, inheritance. Built by Graphify with tree-sitter parsers.</dd>
+    <dt>Embedding</dt><dd>A list of numbers representing text, so that similar meaning gives nearby vectors.</dd>
+    <dt>BM25</dt><dd>A classic keyword-ranking formula; here it's stored as a sparse vector for exact-term matching.</dd>
+    <dt>Reciprocal rank fusion</dt><dd>Merges two rankings by summing 1/(k + rank) for each item, so items ranked well in both win.</dd>
+    <dt>Kafka topic / partition</dt><dd>A named, append-only log split into partitions. Order is guaranteed within a partition; the message key picks the partition.</dd>
+    <dt>Consumer group</dt><dd>Consumers sharing a name split a topic's partitions; different groups each get every message.</dd>
+    <dt>Offset / commit</dt><dd>A consumer's position in a partition. Committing it says "everything before this is done".</dd>
+    <dt>At-least-once</dt><dd>Messages are never lost, but may be delivered twice, so handlers must be idempotent.</dd>
+    <dt>Idempotent</dt><dd>Doing it twice has the same effect as doing it once.</dd>
+    <dt>Dead-letter queue</dt><dd>A topic where messages that keep failing are parked for inspection instead of blocking the stream.</dd>
+    <dt>Strimzi</dt><dd>A Kubernetes operator that runs Kafka from declarative resources (<code>Kafka</code>, <code>KafkaTopic</code>).</dd>
+    <dt>KEDA</dt><dd>Kubernetes event-driven autoscaling: scales Deployments on external signals such as Kafka consumer lag.</dd>
+    <dt>HPA</dt><dd>HorizontalPodAutoscaler: the built-in Kubernetes controller that changes a Deployment's replica count.</dd>
+    <dt>MCP</dt><dd>Model Context Protocol: a standard way to expose tools to AI clients like Claude Code. GraphReview exposes its retrieval tools this way.</dd>
+  </dl>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const behavior = reduce ? "auto" : "smooth";
+  function highlight(id) {
+    document.querySelectorAll(".node").forEach((n) => n.classList.toggle("sel", n.dataset.node === id));
+  }
+  function toCard(id) {
+    highlight(id);
+    const card = document.getElementById("c-" + id);
+    if (!card) return;
+    card.scrollIntoView({ behavior, block: "center" });
+    card.classList.add("flash");
+    card.focus({ preventScroll: true });
+    setTimeout(() => card.classList.remove("flash"), 1600);
+  }
+  document.querySelectorAll(".node").forEach((n) => {
+    n.addEventListener("click", (e) => { e.stopPropagation(); toCard(n.dataset.node); });
+    n.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toCard(n.dataset.node); } });
+  });
+  document.querySelectorAll(".card .back").forEach((b) => b.addEventListener("click", () => {
+    highlight(b.dataset.node);
+    document.getElementById("map").scrollIntoView({ behavior, block: "start" });
+  }));
+})();
+</script>
+</body>
+</html>

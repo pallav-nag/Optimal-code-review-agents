@@ -1,4 +1,4 @@
-.PHONY: install test lint demo demo-claude eval eval-offline up down logs images stack-index stack-demo github-demo k8s-up k8s-down
+.PHONY: install test lint demo demo-claude eval eval-offline up down logs images stack-index stack-demo github-demo docs k8s-up k8s-down
 
 PY ?= python3
 VENV ?= .venv
@@ -27,6 +27,9 @@ eval:               ## seeded-bug benchmark with Claude, all three context modes
 
 eval-offline:       ## harness smoke test with the rule-based fake
 	$(BIN)/graphreview --llm fake --embeddings hash eval --modes graph_rag --out eval/results/offline
+
+docs:               ## regenerate architecture diagrams (docs/img/arch/*.svg) and docs/architecture.html
+	$(PY) docs/diagrams/build.py
 
 up:                 ## full stack: Kafka, Redis, Qdrant, services, Prometheus, Grafana
 	@test -f .env || cp .env.example .env
